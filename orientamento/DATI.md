@@ -29,6 +29,53 @@ Il sistema utilizza selettori CSS per estrarre i dati dalle pagine HTML:
 - Cambiamenti struttura: La struttura HTML potrebbe cambiare, richiedendo aggiornamenti ai selettori
 - Termini di servizio: Necessario rispettare i termini di servizio di Subito.it
 
+## Configurazione del Database
+
+### Database Attuale: SQLite
+L'applicazione utilizza attualmente SQLite come database principale per facilità di configurazione e sviluppo. 
+
+#### Configurazione in .env
+```
+DB_CONNECTION=sqlite
+DB_DATABASE=/absolute/path/to/database.sqlite
+```
+
+#### Vantaggi nell'ambiente di sviluppo
+- Nessuna necessità di server database separato
+- Facilità di backup (singolo file)
+- Configurazione minima
+
+#### Limitazioni
+- Performance limitate con dataset molto grandi
+- Supporto limitato per query complesse
+- Concorrenza limitata (problemi con accessi simultanei)
+
+#### Piano di migrazione
+È previsto il passaggio a PostgreSQL per l'ambiente di produzione quando il volume di dati aumenterà, mantenendo SQLite per gli ambienti di sviluppo.
+
+### Coda dei Job
+La gestione delle code è basata sul database SQLite attraverso la tabella `jobs`.
+
+#### Tabelle correlate
+- `jobs`: Jobs in attesa di esecuzione
+- `failed_jobs`: Jobs falliti
+- `job_batches`: Gruppi di jobs correlati (quando usati)
+
+#### Schema della tabella jobs
+```sql
+CREATE TABLE "jobs" (
+  "id" bigint PRIMARY KEY AUTOINCREMENT NOT NULL,
+  "queue" varchar NOT NULL,
+  "payload" text NOT NULL,
+  "attempts" tinyint NOT NULL,
+  "reserved_at" integer,
+  "available_at" integer NOT NULL,
+  "created_at" integer NOT NULL
+);
+
+CREATE INDEX "jobs_queue_reserved_at_index" ON "jobs" ("queue", "reserved_at");
+```
+
 ## Struttura dei Dati
 
 ### Entità Principali
@@ -153,3 +200,13 @@ User 1:1 UserSetting (Un utente ha una sola configurazione)
 - Le credenziali Telegram degli utenti sono memorizzate in modo sicuro
 - Non vengono raccolti dati personali dai venditori degli annunci
 - I dati sono accessibili solo all'utente proprietario della campagna 
+
+### Gestione dei Limiti di SQLite
+
+Per gestire le limitazioni di SQLite, soprattutto con l'aumento del volume dei dati:
+
+1. **Pulizia periodica**: Eliminazione automatica dei risultati più vecchi di X giorni
+2. **Indicizzazione ottimizzata**: Creazione di indici appropriati per le query più frequenti
+3. **Backup regolari**: Backup pianificati del file database.sqlite
+4. **Monitoraggio dimensioni**: Alert quando il database supera dimensioni critiche
+5. **Strategie di migrazione**: Procedure testate per la migrazione a PostgreSQL quando necessario 

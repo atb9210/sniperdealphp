@@ -7,9 +7,9 @@ Questo documento descrive l'architettura tecnica e lo stack tecnologico utilizza
 ### Backend
 - **Framework**: Laravel PHP
 - **PHP Version**: 8.1+
-- **Database**: MySQL/PostgreSQL
+- **Database**: SQLite (attualmente), con piano di migrazione a MySQL/PostgreSQL
 - **Caching**: Redis (opzionale)
-- **Queue System**: Laravel Queue con database driver
+- **Queue System**: Laravel Queue con database driver (SQLite)
 - **Task Scheduling**: Laravel Scheduler
 
 ### Frontend
@@ -83,11 +83,31 @@ app/
 
 ### Sistema di Code
 
-L'applicazione utilizza Laravel Queue per la gestione delle operazioni asincrone:
-- **Queue Driver**: Database (tabella `jobs`)
-- **Job Class**: SubitoScraperJob
-- **Worker**: Gestito da Supervisor in produzione
-- **Retry Logic**: Configurato per retries automatici in caso di fallimento
+L'applicazione utilizza Laravel Queue con le seguenti caratteristiche:
+- **Queue Driver**: Database (SQLite) configurato in `config/queue.php`
+- **Tabella Queue**: Tabella `jobs` nel database SQLite
+- **Job Class**: SubitoScraperJob implementa l'interfaccia ShouldQueue
+- **Worker**: 
+  - **Locale**: Avviato manualmente con `php artisan queue:work`
+  - **Produzione**: Gestito da Supervisor per garantire esecuzione continua
+- **Retry Logic**: Configurato per ritentare automaticamente in caso di fallimenti (default: 3 tentativi)
+
+#### Gestione dei Queue Workers
+
+**Ambiente di sviluppo (locale)**:
+```bash
+# Avviare un worker in foreground
+php artisan queue:work
+
+# Avviare un worker che processa un solo job 
+php artisan queue:work --once
+
+# Verificare i job in coda
+php artisan queue:monitor
+```
+
+**Ambiente di produzione**:
+Il gestore di processi Supervisor mantiene i worker attivi e li riavvia in caso di errori.
 
 ### Schema del Database
 
@@ -134,14 +154,16 @@ L'applicazione utilizza Laravel Queue per la gestione delle operazioni asincrone
 
 ### Bottlenecks Potenziali
 - **Rate Limiting**: Le richieste a Subito.it devono rispettare limiti per evitare blocchi
-- **Database Load**: La crescita dei risultati può richiedere strategie di partitioning
-- **Queue Performance**: Con molte campagne attive, la coda può diventare un collo di bottiglia
+- **Database Load**: La crescita dei risultati può richiedere migrazione da SQLite a un DBMS più robusto
+- **Queue Performance**: Con molte campagne attive, SQLite potrebbe diventare un collo di bottiglia
+- **Worker Scalability**: Un singolo worker può diventare insufficiente con molte campagne
 
 ### Strategie di Mitigazione
 - **Caching**: Implementare caching per ridurre richieste duplicate
 - **Pruning dei Dati**: Eliminazione periodica di risultati e log vecchi
 - **Queueing**: Distribuzione del carico con multiple queue workers
 - **Randomizzazione**: Variare tempi di scraping per evitare pattern prevedibili
+- **Migrazione Database**: Preparare la migrazione a PostgreSQL per gestire carichi maggiori
 
 ## Sicurezza
 
