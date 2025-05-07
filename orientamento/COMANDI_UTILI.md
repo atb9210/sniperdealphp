@@ -21,6 +21,34 @@ ps aux | grep artisan
 kill <PID>  # Sostituire <PID> con l'ID del processo
 ```
 
+## Frontend e Asset Development (Vite)
+
+### Avviare server Vite per sviluppo frontend
+```bash
+# Installare le dipendenze npm (necessario solo la prima volta o dopo aggiornamenti)
+npm install
+
+# Avviare server Vite in modalità sviluppo (hot reload)
+npm run dev
+
+# Avviare con host specifico (accessibile da altri dispositivi in rete)
+npm run dev -- --host
+```
+
+### Compilare asset per produzione
+```bash
+# Compilare e minimizzare asset per produzione
+npm run build
+```
+
+### Arrestare server Vite
+```bash
+# Premere CTRL+C nel terminale dove è attivo Vite
+# Oppure trovare e terminare il processo
+ps aux | grep vite
+kill <PID>  # Sostituire <PID> con l'ID del processo
+```
+
 ## Gestione Code e Worker
 
 ### Avviare un Queue Worker
@@ -169,9 +197,14 @@ php artisan queue:work &
 WORKER_PID=$!
 echo "Queue worker avviato con PID: $WORKER_PID"
 
+# Avvia il server Vite per frontend in background
+npm run dev &
+VITE_PID=$!
+echo "Server Vite avviato con PID: $VITE_PID"
+
 echo "Ambiente di sviluppo avviato! Per terminare, esegui: ./stop-development.sh"
 # Salva i PID in un file temporaneo
-echo "$SERVER_PID $WORKER_PID" > .dev-pids
+echo "$SERVER_PID $WORKER_PID $VITE_PID" > .dev-pids
 ```
 
 ### Script per arresto ambiente
@@ -182,11 +215,12 @@ E uno script `stop-development.sh`:
 echo "Arresto ambiente di sviluppo SnipeDeal..."
 
 if [ -f .dev-pids ]; then
-    read SERVER_PID WORKER_PID < .dev-pids
+    read SERVER_PID WORKER_PID VITE_PID < .dev-pids
     
     # Termina i processi
     kill $SERVER_PID 2>/dev/null
     kill $WORKER_PID 2>/dev/null
+    kill $VITE_PID 2>/dev/null
     
     echo "Processi terminati."
     rm .dev-pids
