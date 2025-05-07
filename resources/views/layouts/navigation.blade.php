@@ -18,6 +18,12 @@
                     <x-nav-link :href="route('keyword.index')" :active="request()->routeIs('keyword.*')">
                         {{ __('Keywords') }}
                     </x-nav-link>
+                    <x-nav-link :href="route('campaigns.index')" :active="request()->routeIs('campaigns.*')">
+                        {{ __('Campagne') }}
+                    </x-nav-link>
+                    <x-nav-link :href="route('job-logs.index')" :active="request()->routeIs('job-logs.*')">
+                        {{ __('Job Logs') }}
+                    </x-nav-link>
                     <x-nav-link :href="route('settings.index')" :active="request()->routeIs('settings.*')">
                         {{ __('Impostazioni') }}
                     </x-nav-link>
@@ -78,6 +84,12 @@
             </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('keyword.index')" :active="request()->routeIs('keyword.*')">
                 {{ __('Keywords') }}
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('campaigns.index')" :active="request()->routeIs('campaigns.*')">
+                {{ __('Campagne') }}
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('job-logs.index')" :active="request()->routeIs('job-logs.*')">
+                {{ __('Job Logs') }}
             </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('settings.index')" :active="request()->routeIs('settings.*')">
                 {{ __('Impostazioni') }}

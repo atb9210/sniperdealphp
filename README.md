@@ -1,10 +1,22 @@
-# SnipeDeal - Scraper Subito.it
+# SnipeDeal - Scraper e Monitoraggio Annunci Subito.it
 
-Un'applicazione Laravel per il monitoraggio e l'analisi degli annunci su Subito.it.
+Un'applicazione Laravel per il monitoraggio automatico e l'analisi degli annunci su Subito.it, con notifiche Telegram e gestione di campagne personalizzate.
 
 ## Funzionalità Principali
 
-### 1. Scraping degli Annunci
+### 1. Gestione Campagne
+- Creazione e gestione campagne di monitoraggio
+- Configurazione parametri:
+  - Keyword di ricerca
+  - Intervallo di prezzo (min/max)
+  - Numero massimo di pagine da scansionare (1-10)
+  - Intervallo di tempo tra le esecuzioni (in minuti)
+  - Opzione ricerca specifica (qso)
+- Attivazione/disattivazione campagne
+- Esecuzione manuale immediata ("Esegui ora")
+- Pianificazione automatica delle esecuzioni
+
+### 2. Scraping degli Annunci
 - Ricerca annunci per keyword
 - Supporto per ricerca specifica (qso=true)
 - Paginazione automatica (fino a 10 pagine)
@@ -18,57 +30,117 @@ Un'applicazione Laravel per il monitoraggio e l'analisi degli annunci su Subito.
   - Stato (Disponibile/Venduto)
   - Disponibilità spedizione
 
-### 2. Interfaccia Web
-- Form di ricerca con:
-  - Campo keyword
-  - Selezione numero pagine (1-10)
-  - Toggle ricerca specifica
-  - Loading spinner durante la ricerca
-- Visualizzazione risultati in tabella con:
-  - Toggle per mostrare/nascondere immagini
-  - Filtri per annunci venduti e spedizione disponibile
-  - Statistiche (totale disponibili, venduti, sell-through rate, prezzi medi)
-- Storico delle keyword ricercate
+### 3. Notifiche e Monitoraggio
+- Notifiche Telegram per nuovi annunci
+- Configurazione personalizzata dei parametri Telegram
+- Logging dettagliato delle esecuzioni
+- Statistiche di esecuzione (annunci trovati, nuovi, tempo di esecuzione)
 
-### 3. Comandi Artisan
-- `scraper:test {keyword} {--pages=3}`: Test dello scraper con una keyword specifica
+### 4. Dashboard e Interfaccia Web
+- Dashboard con panoramica delle campagne
+- Visualizzazione risultati per ogni campagna
+- Gestione utenti e impostazioni personali
+- Storico delle esecuzioni con log dettagliati
 
 ## Struttura del Progetto
 
 ### Controllers
-- `KeywordFormController`: Gestisce il form di ricerca e la visualizzazione dei risultati
-  - `index()`: Mostra il form e lo storico delle keyword
-  - `store()`: Processa la ricerca e mostra i risultati
+- `CampaignController`: Gestione delle campagne di monitoraggio
+  - `index()`: Lista delle campagne
+  - `create()`, `store()`: Creazione nuove campagne
+  - `show()`: Dettaglio campagna con risultati
+  - `edit()`, `update()`: Modifica campagne
+  - `destroy()`: Eliminazione campagne
+  - `toggle()`: Attivazione/disattivazione
+  - `run()`: Esecuzione manuale immediata
+
+- `JobLogController`: Gestione dei log di esecuzione
+- `UserSettingsController`: Gestione impostazioni utente (inclusi parametri Telegram)
+- `DashboardController`: Visualizzazione dashboard principale
+- `KeywordFormController`: Gestione form di ricerca manuale
+
+### Models
+- `Campaign`: Definizione campagne di monitoraggio
+- `CampaignResult`: Risultati delle campagne (annunci trovati)
+- `JobLog`: Log delle esecuzioni
+- `UserSetting`: Impostazioni utente (inclusi parametri Telegram)
+- `User`: Gestione utenti
+
+### Jobs
+- `SubitoScraperJob`: Job per l'esecuzione delle campagne
+  - Gestione del processo di scraping
+  - Elaborazione dei risultati
+  - Invio notifiche
+  - Logging delle esecuzioni
 
 ### Services
 - `SubitoScraper`: Servizio principale per lo scraping
   - `scrape($keyword, $qso, $pages)`: Metodo principale che coordina lo scraping
-  - `scrapeViaHtml()`: Implementazione dello scraping via HTML
   - Funzioni di supporto per l'estrazione dei dati
 
-### Views
-- `keyword-form/index.blade.php`: Vista principale con:
-  - Form di ricerca
-  - Tabella risultati
-  - Statistiche
-  - Storico keyword
+## Sistema di Code e Job
 
-### Models
-- `Keyword`: Model per lo storico delle keyword ricercate
+L'applicazione utilizza il sistema di code di Laravel per gestire l'esecuzione asincrona delle campagne:
 
-## Come Funziona
+- Quando viene creata una nuova campagna, viene avviato un job iniziale
+- Quando si clicca su "Esegui ora", viene accodato un job immediato
+- La pianificazione automatica gestisce l'esecuzione periodica in base all'intervallo configurato
 
-1. L'utente inserisce una keyword nel form
-2. Il controller processa la richiesta e chiama lo scraper
-3. Lo scraper:
-   - Costruisce l'URL con i parametri corretti
-   - Fa le richieste HTTP per ogni pagina
-   - Estrae i dati usando Symfony DomCrawler
-   - Unisce i risultati di tutte le pagine
-4. I risultati vengono mostrati in una tabella con:
-   - Filtri interattivi
-   - Statistiche in tempo reale
-   - Opzioni di visualizzazione
+### Configurazione Queue Worker
+
+#### Development Environment
+Per processare i job nell'ambiente di sviluppo, esegui:
+
+```bash
+php artisan queue:work
+```
+
+Mantieni questo comando in esecuzione in una finestra di terminale separata mentre lavori sull'applicazione.
+
+#### Production Environment
+Per l'ambiente di produzione, è consigliato utilizzare Supervisor per gestire il processo del queue worker:
+
+1. Installa Supervisor:
+   ```bash
+   # Su Ubuntu/Debian
+   sudo apt-get install supervisor
+   
+   # Su macOS
+   brew install supervisor
+   ```
+
+2. Crea un file di configurazione per il queue worker Laravel:
+   ```bash
+   sudo nano /etc/supervisor/conf.d/snipedeal-worker.conf
+   ```
+
+3. Aggiungi la seguente configurazione:
+   ```
+   [program:snipedeal-worker]
+   process_name=%(program_name)s_%(process_num)02d
+   command=php /path/to/your/project/artisan queue:work --sleep=3 --tries=3 --max-time=3600
+   autostart=true
+   autorestart=true
+   stopasgroup=true
+   killasgroup=true
+   user=www-data
+   numprocs=2
+   redirect_stderr=true
+   stdout_logfile=/path/to/your/project/storage/logs/worker.log
+   stopwaitsecs=3600
+   ```
+
+4. Aggiorna la configurazione:
+   ```bash
+   sudo supervisorctl reread
+   sudo supervisorctl update
+   sudo supervisorctl start snipedeal-worker:*
+   ```
+
+5. Per verificare lo stato dei worker:
+   ```bash
+   sudo supervisorctl status
+   ```
 
 ## Note Tecniche
 
@@ -79,28 +151,38 @@ Un'applicazione Laravel per il monitoraggio e l'analisi degli annunci su Subito.
   - `qso`: true/false per ricerca specifica
   - `page`: numero pagina (1-based)
 
-### Selezione Elementi HTML
-- Card annunci: `div.item-card--small`
-- Titolo: `h2`
-- Prezzo: `p.SmallCard-module_price__yERv7`
-- Località: `span.index-module_town__2H3jy`
-- Data: `span.index-module_date__Fmf-4`
-- Link: `a.SmallCard-module_link__hOkzY`
-- Immagine: `img.CardImage-module_photo__WMsiO`
+### Database
+L'applicazione utilizza tabelle per:
+- `campaigns`: Definizione delle campagne di monitoraggio
+- `campaign_results`: Risultati delle campagne (annunci trovati)
+- `job_logs`: Log delle esecuzioni
+- `user_settings`: Impostazioni utente
+- `users`: Gestione utenti
 
-### Logging
-- Log dettagliati per:
-  - URL delle richieste
-  - Numero di annunci trovati per pagina
-  - Errori e warning
-  - Statistiche di scraping
+### Notifiche Telegram
+Per utilizzare le notifiche Telegram:
+1. Crea un bot Telegram tramite BotFather
+2. Configura il token del bot nelle impostazioni utente
+3. Configura il chat ID nelle impostazioni utente
+4. Attiva le campagne per ricevere notifiche sui nuovi annunci
+
+## Troubleshooting
+
+### Il job non viene eseguito quando clicco su "Esegui ora"
+- Verifica che il queue worker sia in esecuzione con `php artisan queue:work`
+- In produzione, verifica che Supervisor sia configurato correttamente
+- Controlla i log in `storage/logs` per eventuali errori
+
+### Non ricevo notifiche Telegram
+- Verifica che il token del bot sia corretto
+- Verifica che il chat ID sia corretto
+- Assicurati di aver avviato una conversazione con il bot
+- Controlla i log per eventuali errori di invio delle notifiche
 
 ## Prossimi Sviluppi Possibili
-
-1. Salvataggio automatico dei risultati nel database
-2. Notifiche per nuovi annunci
-3. Analisi dei prezzi nel tempo
-4. Filtri avanzati (prezzo, località, etc.)
-5. Export dei risultati in vari formati
-6. Dashboard con grafici e statistiche
-7. Sistema di alert per annunci che corrispondono a criteri specifici
+1. Supporto per altri siti di annunci (oltre a Subito.it)
+2. Analisi dei prezzi nel tempo con grafici
+3. Filtri avanzati per la ricerca
+4. App mobile per la gestione delle campagne
+5. Sistema di alert basato su regole personalizzate
+6. Integrazione con altri sistemi di notifica (email, SMS, etc.)

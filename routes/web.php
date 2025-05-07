@@ -3,15 +3,18 @@
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\KeywordFormController;
 use App\Http\Controllers\UserSettingsController;
+use App\Http\Controllers\CampaignController;
+use App\Http\Controllers\JobLogController;
+use App\Http\Controllers\DashboardController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return view('welcome');
 });
 
-Route::get('/dashboard', function () {
-    return view('dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
+Route::get('/dashboard', [DashboardController::class, 'index'])
+    ->middleware(['auth', 'verified'])
+    ->name('dashboard');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -26,6 +29,17 @@ Route::middleware('auth')->group(function () {
     Route::get('/settings', [UserSettingsController::class, 'index'])->name('settings.index');
     Route::post('/settings', [UserSettingsController::class, 'update'])->name('settings.update');
     Route::post('/settings/test-telegram', [UserSettingsController::class, 'testTelegram'])->name('settings.test-telegram');
+
+    // Campaign Routes
+    Route::resource('campaigns', CampaignController::class);
+    Route::post('/campaigns/{campaign}/toggle', [CampaignController::class, 'toggle'])->name('campaigns.toggle');
+    Route::post('/campaigns/{campaign}/run', [CampaignController::class, 'run'])->name('campaigns.run');
+
+    // Job Log Routes
+    Route::get('/job-logs', [JobLogController::class, 'index'])->name('job-logs.index');
+    Route::get('/job-logs/{jobLog}', [JobLogController::class, 'show'])->name('job-logs.show');
+    Route::get('/campaigns/{campaign}/job-logs', [JobLogController::class, 'forCampaign'])->name('job-logs.campaign');
+    Route::post('/campaigns/{campaign}/job-logs/clear', [JobLogController::class, 'clear'])->name('job-logs.clear');
 });
 
 require __DIR__.'/auth.php';
