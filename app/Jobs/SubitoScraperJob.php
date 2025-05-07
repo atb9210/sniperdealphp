@@ -67,16 +67,24 @@ class SubitoScraperJob implements ShouldQueue
             // Process the results
             $newResults = $this->processResults($ads);
             
+            // Check for any unnotified results, regardless of whether they are new
+            $unnotifiedCount = $this->campaign->results()
+                ->where('notified', false)
+                ->count();
+                
             // Mark job as completed
             $jobLog->markAsCompleted(
                 count($ads),
                 $newResults,
-                "Successfully processed " . count($ads) . " ads, " . $newResults . " new"
+                "Successfully processed " . count($ads) . " ads, " . $newResults . " new, " . $unnotifiedCount . " unnotified"
             );
 
-            // Send notifications for new results if needed
-            if ($newResults > 0) {
-                $this->sendNotifications($newResults);
+            // Send notifications if there are any unnotified results (new or not)
+            if ($unnotifiedCount > 0) {
+                $this->sendNotifications($unnotifiedCount);
+                Log::info("Notifications queued for {$unnotifiedCount} unnotified results");
+            } else {
+                Log::info("No unnotified results to send notifications for");
             }
         } catch (Exception $e) {
             Log::error("Error in campaign job: " . $e->getMessage());
@@ -110,7 +118,7 @@ class SubitoScraperJob implements ShouldQueue
                     'stato' => $ad['stato'] ?? $existingResult->stato,
                     'spedizione' => $ad['spedizione'] ?? $existingResult->spedizione,
                     'date' => $ad['date'] ?? $existingResult->date,
-                    'is_new' => false,
+                    'is_new' => $existingResult->notified ? false : true,
                 ]);
             } else {
                 // Create new result
@@ -178,70 +186,152 @@ class SubitoScraperJob implements ShouldQueue
      */
     protected function sendNotifications(int $newResults): void
     {
-        // Get user settings
-        $user = $this->campaign->user;
-        $settings = $user->settings ?? null;
-
-        if (!$settings || empty($settings->telegram_chat_id) || empty($settings->telegram_token)) {
+        // Get user settings directly dalla tabella per evitare problemi di relazione
+        $userId = $this->campaign->user_id;
+        $settings = \App\Models\UserSetting::where('user_id', $userId)->first();
+        
+        if (!$settings) {
+            Log::error("No UserSettings found for user ID {$userId}");
+            return;
+        }
+        
+        if (empty($settings->telegram_chat_id) || empty($settings->telegram_token)) {
             Log::info("Skipping notifications for campaign {$this->campaign->name}: no valid Telegram settings");
             return;
         }
 
         try {
-            // Get new results
+            // Get new results - MODIFIED to check only notified status, not is_new status
             $results = $this->campaign->results()
-                ->where('is_new', true)
                 ->where('notified', false)
                 ->get();
 
             if ($results->isEmpty()) {
+                Log::info("No unnotified results for campaign {$this->campaign->name}");
                 return;
             }
 
-            // Prepare message
-            $message = "🔔 *Nuovi risultati per campagna: {$this->campaign->name}*\n\n";
-            $message .= "Trovati {$newResults} nuovi annunci per la keyword: *{$this->campaign->keyword}*\n\n";
-
-            // Add first 5 results
-            foreach ($results->take(5) as $index => $result) {
-                $message .= ($index + 1) . ". [{$result->title}]({$result->link})\n";
-                $message .= "💰 {$result->price}\n";
-                if ($result->location) {
-                    $message .= "📍 {$result->location}\n";
+            Log::info("Found {$results->count()} unnotified results for campaign {$this->campaign->name}");
+            
+            // Send initial summary message
+            $summaryMessage = "🔍 *Campagna: {$this->campaign->name}*\n";
+            $summaryMessage .= "🆕 Trovati {$results->count()} nuovi annunci per: *{$this->campaign->keyword}*\n";
+            $summaryMessage .= "⏱ " . now()->format('d/m/Y H:i:s') . "\n\n";
+            $summaryMessage .= "📲 _Ti invierò un messaggio per ogni annuncio..._";
+            
+            $success = $this->sendTelegramMessage($settings, $summaryMessage);
+            
+            if (!$success) {
+                Log::error("Failed to send summary message to Telegram for campaign {$this->campaign->name}");
+                return;
+            }
+            
+            // Sleep briefly to avoid rate limiting
+            sleep(1);
+            
+            $sentCount = 0;
+            
+            // Send individual message for each result
+            foreach ($results as $result) {
+                // Prepare detailed message for this ad
+                $message = $this->formatAdMessage($result);
+                
+                // Send message
+                $success = $this->sendTelegramMessage($settings, $message);
+                
+                if ($success) {
+                    // Mark as notified
+                    $result->notified = true;
+                    $result->is_new = false;
+                    $result->save();
+                    $sentCount++;
+                    
+                    // Avoid Telegram rate limiting
+                    usleep(300000); // 300ms delay between messages
+                } else {
+                    Log::error("Failed to send notification for result ID: {$result->id}, title: {$result->title}");
                 }
-                $message .= "\n";
-
-                // Mark as notified
-                $result->markAsNotified();
             }
-
-            if ($results->count() > 5) {
-                $message .= "... e altri " . ($results->count() - 5) . " annunci\n";
-            }
-
-            // Send Telegram message
-            $telegramApiUrl = "https://api.telegram.org/bot{$settings->telegram_token}/sendMessage";
-            $ch = curl_init($telegramApiUrl);
-            curl_setopt($ch, CURLOPT_POST, 1);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, [
-                'chat_id' => $settings->telegram_chat_id,
-                'text' => $message,
-                'parse_mode' => 'Markdown',
-                'disable_web_page_preview' => false,
-            ]);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
-            
-            if ($httpCode != 200) {
-                Log::error("Failed to send Telegram notification: HTTP $httpCode");
-            } else {
-                Log::info("Telegram notification sent for campaign {$this->campaign->name}");
-            }
-        } catch (Exception $e) {
+            Log::info("Telegram notifications sent for campaign {$this->campaign->name}: {$sentCount} of {$results->count()} messages");
+        } catch (\Exception $e) {
             Log::error("Error sending notifications: " . $e->getMessage());
+            Log::error("Stack trace: " . $e->getTraceAsString());
         }
+    }
+    
+    /**
+     * Format a single ad message with emoji and rich formatting.
+     */
+    protected function formatAdMessage(CampaignResult $result): string
+    {
+        $message = "📢 *{$result->title}*\n\n";
+        
+        // Price with emoji based on type
+        if ($result->price) {
+            $message .= "💰 *Prezzo:* {$result->price}\n";
+        }
+        
+        // Location with emoji
+        if ($result->location) {
+            $message .= "📍 *Luogo:* {$result->location}\n";
+        }
+        
+        // Date with emoji
+        if ($result->date) {
+            $message .= "📅 *Data:* {$result->date}\n";
+        }
+        
+        // Status (Available/Sold) with emoji
+        $statusEmoji = ($result->stato == 'Disponibile') ? '✅' : '❌';
+        $message .= "{$statusEmoji} *Stato:* {$result->stato}\n";
+        
+        // Shipping info with emoji
+        $shippingEmoji = $result->spedizione ? '🚚' : '🏪';
+        $shippingText = $result->spedizione ? 'Disponibile' : 'Ritiro in zona';
+        $message .= "{$shippingEmoji} *Spedizione:* {$shippingText}\n";
+        
+        // Add link with call to action
+        $message .= "\n🔗 [Vedi Annuncio]({$result->link})\n";
+        
+        // Add campaign info
+        $message .= "\n📊 _Dalla campagna \"{$this->campaign->name}\"_";
+        
+        return $message;
+    }
+    
+    /**
+     * Send a message to Telegram.
+     * 
+     * @return bool Success status
+     */
+    protected function sendTelegramMessage($settings, string $message): bool
+    {
+        $telegramApiUrl = "https://api.telegram.org/bot{$settings->telegram_token}/sendMessage";
+        Log::info("Sending Telegram message to URL: " . str_replace($settings->telegram_token, '[HIDDEN]', $telegramApiUrl));
+        
+        $ch = curl_init($telegramApiUrl);
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, [
+            'chat_id' => $settings->telegram_chat_id,
+            'text' => $message,
+            'parse_mode' => 'Markdown',
+            'disable_web_page_preview' => false,
+        ]);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+        
+        if ($httpCode != 200) {
+            Log::error("Failed to send Telegram notification: HTTP $httpCode, Error: $error");
+            Log::error("Response: $response");
+            return false;
+        }
+        
+        Log::info("Telegram API response: HTTP $httpCode - Success");
+        return true;
     }
 }

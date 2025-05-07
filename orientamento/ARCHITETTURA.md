@@ -83,31 +83,63 @@ app/
 
 ### Sistema di Code
 
-L'applicazione utilizza Laravel Queue con le seguenti caratteristiche:
-- **Queue Driver**: Database (SQLite) configurato in `config/queue.php`
-- **Tabella Queue**: Tabella `jobs` nel database SQLite
+L'applicazione utilizza un approccio misto per la gestione dei job:
+- **Esecuzione Sincrona**: I job di scraping vengono eseguiti in modo sincrono tramite `dispatchSync()` in modo che le notifiche vengano inviate immediatamente
+- **Queue Worker**: Un worker può essere attivato opzionalmente per operazioni asincrone quando necessario
+- **Tabella Queue**: Tabella `jobs` nel database SQLite configurata in `config/queue.php`
 - **Job Class**: SubitoScraperJob implementa l'interfaccia ShouldQueue
-- **Worker**: 
-  - **Locale**: Avviato manualmente con `php artisan queue:work`
-  - **Produzione**: Gestito da Supervisor per garantire esecuzione continua
 - **Retry Logic**: Configurato per ritentare automaticamente in caso di fallimenti (default: 3 tentativi)
 
 #### Gestione dei Queue Workers
 
 **Ambiente di sviluppo (locale)**:
 ```bash
-# Avviare un worker in foreground
+# Avviare un worker in background tramite script
+./start-queue-worker.sh
+
+# Terminare i worker attivi
+./stop-queue-worker.sh
+
+# Avviare un worker manualmente
 php artisan queue:work
-
-# Avviare un worker che processa un solo job 
-php artisan queue:work --once
-
-# Verificare i job in coda
-php artisan queue:monitor
 ```
 
 **Ambiente di produzione**:
 Il gestore di processi Supervisor mantiene i worker attivi e li riavvia in caso di errori.
+
+### Sistema di Notifiche
+
+L'applicazione utilizza l'API di Telegram per inviare notifiche sugli annunci trovati:
+
+1. **Configurazione**:
+   - Ogni utente ha un token e un chat_id Telegram configurati nelle impostazioni
+   - Accessibili tramite la relazione `User->settings` e i campi `telegram_token` e `telegram_chat_id`
+
+2. **Flusso di notifica**:
+   - Quando vengono trovati risultati non notificati, viene inviato un messaggio di riepilogo
+   - Poi un messaggio dettagliato per ciascun annuncio
+   - I messaggi includono emoji, formattazione Markdown e link
+   - Viene implementato un delay per rispettare i rate limit dell'API Telegram
+
+3. **Marcatura notifiche**:
+   - I risultati vengono marcati come `notified = true` dopo l'invio
+   - Lo stato `is_new` viene impostato su `false` dopo la notifica
+   - È possibile resettare lo stato con `campaigns:force ID --reset-notified`
+
+4. **Diagnostica**:
+   - Il comando `telegram:status` fornisce una panoramica completa dello stato delle notifiche
+   - I log dettagliati vengono salvati in `storage/logs/laravel.log`
+
+### Comandi Artisan
+
+L'applicazione include i seguenti comandi personalizzati:
+
+1. **RunCampaignJobs**: Esegue le campagne dovute in base alla programmazione
+2. **ForceCampaignScrape**: Forza l'esecuzione immediata di una campagna specifica
+3. **CheckNotificationStatus**: Mostra lo stato di tutte le notifiche nel sistema
+4. **TestScraper**: Permette di testare lo scraper con una keyword specifica
+
+La documentazione completa dei comandi è disponibile in `orientamento/COMANDI_UTILI.md`.
 
 ### Schema del Database
 

@@ -18,7 +18,13 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule): void
     {
         // $schedule->command('inspire')->hourly();
-        $schedule->command('campaigns:run')->everyMinute();
+        
+        // Esegue il controllo delle campagne ogni minuto
+        // Ora che usa dispatchSync le notifiche verranno inviate immediatamente
+        $schedule->command('campaigns:run')
+            ->everyMinute()
+            ->withoutOverlapping(5)
+            ->appendOutputTo(storage_path('logs/scheduler.log'));
     }
 
     /**

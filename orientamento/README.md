@@ -10,16 +10,15 @@ L'obiettivo principale dell'applicazione è automatizzare la ricerca e il monito
 
 1. **Sistema di Scraping**: Un motore di scraping che estrae dati da Subito.it in modo efficiente
 2. **Gestione Campagne**: Dashboard per creare e gestire diverse campagne di monitoraggio
-3. **Sistema di Code**: Gestione asincrona delle operazioni di scraping tramite Laravel Queue
-4. **Notifiche Telegram**: Invio automatico di notifiche su nuovi annunci trovati
+3. **Sistema di Notifiche**: Invio automatico di notifiche Telegram in tempo reale per nuovi annunci 
+4. **Strumenti di Diagnostica**: Comandi per monitorare lo stato del sistema e risolvere problemi
 5. **Interfaccia Utente**: UI moderna e reattiva per la gestione delle campagne e la visualizzazione dei risultati
 
 ## Tecnologie Utilizzate
 
 - **Backend**: Laravel PHP framework
 - **Frontend**: Blade + Alpine.js + Tailwind CSS
-- **Database**: MySQL/PostgreSQL
-- **Queue System**: Laravel Queue con database driver
+- **Database**: SQLite (con piano di migrazione a PostgreSQL)
 - **Notifiche**: API Telegram
 - **Scraping**: Symfony DomCrawler
 
@@ -28,9 +27,9 @@ L'obiettivo principale dell'applicazione è automatizzare la ricerca e il monito
 L'applicazione è funzionale con le seguenti caratteristiche implementate:
 - Creazione e gestione campagne
 - Scraping automatico di Subito.it
-- Gestione dei risultati e dei log
-- Notifiche Telegram
-- Dashboard per il monitoraggio
+- Notifiche Telegram in tempo reale
+- Strumenti di diagnostica e monitoraggio
+- Dashboard per la visualizzazione dei risultati
 
 Il progetto è in fase di sviluppo attivo con miglioramenti continui all'interfaccia utente, all'efficienza dello scraping e all'aggiunta di nuove funzionalità.
 

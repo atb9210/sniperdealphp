@@ -81,11 +81,13 @@ class RunCampaignJobs extends Command
         $this->info("Dispatching job for campaign: {$campaign->name} (ID: {$campaign->id})");
         
         try {
-            SubitoScraperJob::dispatch($campaign);
-            $this->info("Job dispatched successfully");
+            // Esegue il job immediatamente in modo sincrono
+            // invece di metterlo in coda
+            SubitoScraperJob::dispatchSync($campaign);
+            $this->info("Job executed successfully");
         } catch (\Exception $e) {
-            $this->error("Failed to dispatch job: " . $e->getMessage());
-            Log::error("Failed to dispatch job for campaign {$campaign->id}: " . $e->getMessage());
+            $this->error("Failed to execute job: " . $e->getMessage());
+            Log::error("Failed to execute job for campaign {$campaign->id}: " . $e->getMessage());
         }
     }
 }

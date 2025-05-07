@@ -22,6 +22,24 @@ Questo documento tiene traccia del progresso dello sviluppo di SnipeDeal, docume
 - Implementazione di JobLog separato per tenere traccia dello stato dei job
 - Aggiunta di documentazione in README su come configurare correttamente il queue worker
 
+### 06/05/2025 - Risoluzione problemi di notifica e miglioramenti dell'architettura
+
+### Problemi risolti
+- Risolto il problema delle notifiche Telegram che non venivano inviate per nuovi risultati
+- Corretto il metodo di recupero delle impostazioni utente per garantire l'accesso alle configurazioni Telegram
+- Migliorato il tracking delle notifiche con una gestione più robusta degli stati `is_new` e `notified`
+
+### Miglioramenti implementati
+- Modificato l'approccio ai job: da asincrono (queue) a sincrono (dispatchSync) per garantire l'invio immediato delle notifiche
+- Creato un sistema di diagnostica per monitorare lo stato delle notifiche (`telegram:status`)
+- Aggiunto comando per forzare l'esecuzione di campagne con possibilità di reset delle notifiche
+- Creati script di utilità per la gestione dei queue worker (`start-queue-worker.sh`, `stop-queue-worker.sh`)
+
+### Architettura aggiornata
+- Semplificata la struttura dei comandi, rimuovendo quelli temporanei e di test
+- Migliorata la gestione degli errori con log più dettagliati
+- Aggiornata la documentazione per riflettere i cambiamenti nell'architettura
+
 ## Aprile 2025
 
 ### 28/04/2025 - Integrazione Notifiche Telegram
@@ -93,3 +111,21 @@ Questo documento tiene traccia del progresso dello sviluppo di SnipeDeal, docume
 - Esportazione dati in vari formati
 - API per accesso programmatico
 - Miglioramenti UX/UI basati sul feedback degli utenti 
+
+## 05/05/2025 - Prima versione funzionante del sistema di scraping
+
+### Funzionalità implementate
+- Creato il servizio SubitoScraper per estrarre dati da Subito.it
+- Implementato il sistema di campagne con parametri configurabili
+- Creato il job SubitoScraperJob per l'esecuzione asincrona
+- Implementato il sistema di gestione dei risultati con deduplicazione
+
+### Architettura creata
+- Modelli per Campaign, CampaignResult e JobLog
+- Sistema di code con Laravel Queue
+- Scheduler per l'esecuzione periodica delle campagne
+
+### Note
+- Il sistema base funziona, ma necessita di miglioramenti nell'interfaccia
+- La gestione degli errori è ancora limitata
+- Il sistema di notifiche sarà implementato nella prossima fase 

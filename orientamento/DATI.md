@@ -185,9 +185,30 @@ User 1:1 UserSetting (Un utente ha una sola configurazione)
 1. **Acquisizione**: Scraped da Subito.it durante l'esecuzione di una campagna
 2. **Elaborazione**: Filtrazione in base ai criteri della campagna (prezzo min/max)
 3. **Storage**: Salvataggio nel database come CampaignResult
-4. **Notifica**: Invio notifiche per nuovi risultati
+4. **Notifica**: 
+   - Rilevamento risultati non notificati (`notified = false`)
+   - Invio messaggio di riepilogo con conteggio risultati
+   - Invio messaggi dettagliati per ogni risultato
+   - Marcatura risultati come notificati (`notified = true`, `is_new = false`)
 5. **Visualizzazione**: Presentazione all'utente tramite interfaccia web
 6. **Archiviazione/Eliminazione**: I dati più vecchi possono essere eliminati periodicamente
+
+### Stati dei Risultati
+I risultati delle campagne mantengono due flag di stato importanti:
+
+1. **is_new**: Indica se un risultato è stato visto dall'utente
+   - `true`: Risultato non ancora visto dall'utente
+   - `false`: Risultato già visto/non più nuovo
+
+2. **notified**: Indica se è stata inviata una notifica per il risultato
+   - `true`: Notifica inviata con successo
+   - `false`: Notifica non ancora inviata
+
+Questi stati permettono di:
+- Tracciare quali risultati sono stati notificati all'utente
+- Differenziare tra risultati nuovi e già visti nell'interfaccia
+- Inviare notifiche solo per i risultati non ancora notificati
+- Resettare le notifiche quando necessario per reinvio
 
 ### Strategia di Deduplicazione
 - Per identificare annunci duplicati, viene utilizzato il campo `link` come identificatore unico
