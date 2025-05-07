@@ -18,6 +18,9 @@
                     <x-nav-link :href="route('keyword.index')" :active="request()->routeIs('keyword.*')">
                         {{ __('Keywords') }}
                     </x-nav-link>
+                    <x-nav-link :href="route('settings.index')" :active="request()->routeIs('settings.*')">
+                        {{ __('Impostazioni') }}
+                    </x-nav-link>
                 </div>
             </div>
 
@@ -75,6 +78,9 @@
             </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('keyword.index')" :active="request()->routeIs('keyword.*')">
                 {{ __('Keywords') }}
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('settings.index')" :active="request()->routeIs('settings.*')">
+                {{ __('Impostazioni') }}
             </x-responsive-nav-link>
         </div>
 

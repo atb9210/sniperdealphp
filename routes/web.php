@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\KeywordFormController;
+use App\Http\Controllers\UserSettingsController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -20,6 +21,11 @@ Route::middleware('auth')->group(function () {
     // Keyword Form Routes
     Route::get('/keyword', [KeywordFormController::class, 'index'])->name('keyword.index');
     Route::post('/keyword', [KeywordFormController::class, 'store'])->name('keyword.store');
+    
+    // User Settings Routes
+    Route::get('/settings', [UserSettingsController::class, 'index'])->name('settings.index');
+    Route::post('/settings', [UserSettingsController::class, 'update'])->name('settings.update');
+    Route::post('/settings/test-telegram', [UserSettingsController::class, 'testTelegram'])->name('settings.test-telegram');
 });
 
 require __DIR__.'/auth.php';
