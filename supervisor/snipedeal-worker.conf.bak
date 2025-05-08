@@ -1,0 +1,10 @@
+[program:snipedeal-worker]
+process_name=%(program_name)s
+command=php /Users/atb/Documents/SnipeDealPhp/artisan queue:work --tries=3 --max-time=3600
+autostart=true
+autorestart=true
+user=atb
+numprocs=1
+redirect_stderr=true
+stdout_logfile=/Users/atb/Documents/SnipeDealPhp/storage/logs/worker.log
+stopwaitsecs=60 

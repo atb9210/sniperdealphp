@@ -24,7 +24,13 @@ class Kernel extends ConsoleKernel
         $schedule->command('campaigns:run')
             ->everyMinute()
             ->withoutOverlapping(5)
-            ->appendOutputTo(storage_path('logs/scheduler.log'));
+            ->appendOutputTo(storage_path('logs/scheduler.log'))
+            ->onSuccess(function () {
+                info('Scheduler: campaigns:run eseguito con successo');
+            })
+            ->onFailure(function () {
+                info('Scheduler: campaigns:run fallito');
+            });
     }
 
     /**

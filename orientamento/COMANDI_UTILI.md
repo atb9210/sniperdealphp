@@ -29,6 +29,17 @@ php artisan campaigns:force ID_CAMPAGNA
 php artisan campaigns:force ID_CAMPAGNA --reset-notified
 ```
 
+### campaigns:monitor
+Mostra lo stato di esecuzione pianificata di tutte le campagne, evidenziando le esecuzioni previste e i ritardi.
+
+```bash
+# Visualizza lo stato attuale
+php artisan campaigns:monitor
+
+# Monitora in tempo reale con aggiornamento ogni 5 secondi
+php artisan campaigns:monitor --watch
+```
+
 ## Comandi di Monitoraggio
 
 ### telegram:status
@@ -99,6 +110,45 @@ Arresta i queue worker in esecuzione.
 
 ```bash
 ./stop-queue-worker.sh
+```
+
+### run-scheduler.sh
+Esegue lo scheduler di Laravel in continuo in ambiente locale (utile per lo sviluppo).
+
+```bash
+./run-scheduler.sh
+```
+
+### install-supervisor.sh
+Installa e configura Supervisor automaticamente per gestire lo scheduler e i queue worker.
+
+```bash
+./install-supervisor.sh
+```
+
+## Gestione Supervisor
+
+Se hai installato Supervisor, puoi utilizzare i seguenti comandi:
+
+```bash
+# Controlla lo stato dei processi
+supervisorctl status
+
+# Riavvia lo scheduler
+supervisorctl restart snipedeal-scheduler
+
+# Riavvia il worker
+supervisorctl restart snipedeal-worker
+
+# Ferma tutti i processi
+supervisorctl stop all
+
+# Avvia tutti i processi
+supervisorctl start all
+
+# Ricarica la configurazione
+supervisorctl reread
+supervisorctl update
 ```
 
 ## Note Importanti

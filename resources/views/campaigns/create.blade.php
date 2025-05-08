@@ -52,7 +52,7 @@
 
                             <div>
                                 <x-input-label for="interval_minutes" :value="__('Intervallo di controllo (minuti)')" />
-                                <x-text-input id="interval_minutes" name="interval_minutes" type="number" min="5" class="mt-1 block w-full" required value="{{ old('interval_minutes', 60) }}" />
+                                <x-text-input id="interval_minutes" name="interval_minutes" type="number" min="1" class="mt-1 block w-full" required value="{{ old('interval_minutes', 60) }}" />
                                 <x-input-error class="mt-2" :messages="$errors->get('interval_minutes')" />
                                 <p class="mt-1 text-sm text-gray-500">Ogni quanti minuti eseguire la ricerca.</p>
                             </div>
