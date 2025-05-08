@@ -41,7 +41,7 @@ class CampaignController extends Controller
             'min_price' => 'nullable|numeric|min:0',
             'max_price' => 'nullable|numeric|min:0|gte:min_price',
             'max_pages' => 'required|integer|min:1|max:10',
-            'interval_minutes' => 'required|integer|min:5',
+            'interval_minutes' => 'required|integer|min:1',
             'qso' => 'boolean',
         ]);
 
@@ -96,7 +96,7 @@ class CampaignController extends Controller
             'min_price' => 'nullable|numeric|min:0',
             'max_price' => 'nullable|numeric|min:0|gte:min_price',
             'max_pages' => 'required|integer|min:1|max:10',
-            'interval_minutes' => 'required|integer|min:5',
+            'interval_minutes' => 'required|integer|min:1',
             'qso' => 'boolean',
         ]);
 
