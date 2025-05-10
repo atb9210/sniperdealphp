@@ -1,0 +1,4 @@
+Questo è un file di test per il branch testdeploy2.
+Data: $(date)
+Branch: testdeploy2
+Test: Nuovo branch deployment 
