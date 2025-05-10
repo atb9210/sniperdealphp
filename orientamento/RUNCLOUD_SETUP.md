@@ -23,7 +23,7 @@ Per garantire che le campagne vengano eseguite automaticamente, è necessario co
 2. Vai su **Cron Jobs** dal menu laterale
 3. Clicca su **Add Cron Job**
 4. Configura il cron job con i seguenti valori:
-   - **Command**: `/home/runcloud/webapps/snipedeal/run-scheduler-production.sh`
+   - **Command**: `/home/runcloud/webapps/sniper-deal/run-scheduler-production.sh`
    - **User**: (seleziona l'utente della tua web app)
    - **Frequency**: Seleziona "Every minute" o inserisci `* * * * *`
    - **Comment**: Laravel Scheduler for SnipeDeal
@@ -36,12 +36,12 @@ Dopo aver configurato il cron job, puoi verificare che lo scheduler stia funzion
 
 1. Controlla i log dello scheduler:
    ```
-   tail -f /home/runcloud/webapps/snipedeal/storage/logs/scheduler.log
+   tail -f /home/runcloud/webapps/sniper-deal/storage/logs/scheduler.log
    ```
 
 2. Esegui il comando di monitoraggio delle campagne:
    ```
-   cd /home/runcloud/webapps/snipedeal
+   cd /home/runcloud/webapps/sniper-deal
    php artisan campaigns:monitor
    ```
 
@@ -75,7 +75,7 @@ Se le campagne non vengono eseguite come previsto:
 
 4. Controlla i log di Laravel per eventuali errori:
    ```
-   tail -f /home/runcloud/webapps/snipedeal/storage/logs/laravel.log
+   tail -f /home/runcloud/webapps/sniper-deal/storage/logs/laravel.log
    ```
 
 ## Considerazioni sulla Scalabilità
