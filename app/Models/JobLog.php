@@ -69,7 +69,7 @@ class JobLog extends Model
     /**
      * Create a new job log for a campaign with 'running' status.
      */
-    public static function createRunning(Campaign $campaign, string $message = null): self
+    public static function createRunning(Campaign $campaign, ?string $message = null): self
     {
         return self::create([
             'campaign_id' => $campaign->id,
@@ -82,7 +82,7 @@ class JobLog extends Model
     /**
      * Mark the job log as completed successfully.
      */
-    public function markAsCompleted(int $resultsCount, int $newResultsCount, string $message = null): void
+    public function markAsCompleted(int $resultsCount, int $newResultsCount, ?string $message = null): void
     {
         $this->update([
             'status' => 'success',

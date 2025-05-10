@@ -32,5 +32,19 @@
                 {{ $slot }}
             </main>
         </div>
+        
+        <!-- Additional Scripts -->
+        @stack('scripts')
+        
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                console.log('App layout loaded');
+                if (typeof window.Alpine !== 'undefined') {
+                    console.log('Alpine is available globally');
+                } else {
+                    console.error('Alpine is not available globally');
+                }
+            });
+        </script>
     </body>
 </html>
