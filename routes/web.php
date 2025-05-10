@@ -29,6 +29,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/settings', [UserSettingsController::class, 'index'])->name('settings.index');
     Route::post('/settings', [UserSettingsController::class, 'update'])->name('settings.update');
     Route::post('/settings/test-telegram', [UserSettingsController::class, 'testTelegram'])->name('settings.test-telegram');
+    Route::post('/settings/test-proxy', [UserSettingsController::class, 'testProxy'])->name('settings.test-proxy');
+    Route::get('/settings/dump-proxies', [UserSettingsController::class, 'dumpProxies'])->name('settings.dump-proxies');
 
     // Campaign Routes
     Route::resource('campaigns', CampaignController::class);

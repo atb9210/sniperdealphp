@@ -11,6 +11,11 @@ class UserSetting extends Model
         'user_id',
         'telegram_chat_id',
         'telegram_token',
+        'proxies',
+    ];
+
+    protected $casts = [
+        'proxies' => 'array',
     ];
 
     /**
@@ -19,5 +24,26 @@ class UserSetting extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+    
+    /**
+     * Get active proxies list (non-empty values)
+     */
+    public function getActiveProxiesAttribute(): array
+    {
+        if (empty($this->proxies)) {
+            return [];
+        }
+        
+        // Filtra solo i proxy non vuoti
+        return array_values(array_filter($this->proxies, fn($proxy) => !empty($proxy)));
+    }
+    
+    /**
+     * Check if user has active proxies configured
+     */
+    public function hasActiveProxies(): bool
+    {
+        return count($this->active_proxies) > 0;
     }
 }

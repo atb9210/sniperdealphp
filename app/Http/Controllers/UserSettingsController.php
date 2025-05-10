@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\UserSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 
 class UserSettingsController extends Controller
@@ -27,17 +28,136 @@ class UserSettingsController extends Controller
      */
     public function update(Request $request)
     {
+        Log::info('Settings update request received', ['request' => $request->all()]);
+        
         $validated = $request->validate([
             'telegram_chat_id' => 'nullable|string|max:255',
             'telegram_token' => 'nullable|string|max:255',
+            'proxy_list' => 'nullable|string',
+            'action' => 'nullable|string',
         ]);
 
         $settings = UserSetting::firstOrCreate(
             ['user_id' => Auth::id()]
         );
         
-        $settings->update($validated);
-
+        // Handle Telegram settings
+        if (isset($validated['telegram_chat_id'])) {
+            $settings->telegram_chat_id = $validated['telegram_chat_id'];
+        }
+        
+        if (isset($validated['telegram_token'])) {
+            $settings->telegram_token = $validated['telegram_token'];
+        }
+        
+        // Handle proxy actions
+        if (isset($validated['action']) && $validated['action'] === 'clear_proxies') {
+            Log::info('Clearing all proxies');
+            $settings->proxies = [];
+            $settings->save();
+            return redirect()->route('settings.index')
+                ->with('success', 'Tutti i proxy sono stati rimossi.');
+        }
+        
+        if (isset($validated['action']) && $validated['action'] === 'test_proxy') {
+            Log::info('Testing proxy');
+            if (empty($settings->proxies)) {
+                return redirect()->route('settings.index')
+                    ->with('error', 'Nessun proxy da testare.');
+            }
+            
+            $firstProxy = $settings->proxies[0] ?? null;
+            if (!$firstProxy) {
+                return redirect()->route('settings.index')
+                    ->with('error', 'Proxy non valido.');
+            }
+            
+            try {
+                $testUrl = 'https://subito.it';
+                $ch = curl_init($testUrl);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_PROXY, $firstProxy);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+                curl_setopt($ch, CURLOPT_HEADER, true);
+                curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+                
+                $response = curl_exec($ch);
+                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $error = curl_error($ch);
+                curl_close($ch);
+                
+                if ($response === false) {
+                    return redirect()->route('settings.index')
+                        ->with('proxy_test_result', 'Errore di connessione: ' . $error)
+                        ->with('proxy_test_success', false);
+                }
+                
+                return redirect()->route('settings.index')
+                    ->with('proxy_test_result', "Connessione riuscita! Codice HTTP: {$httpCode}")
+                    ->with('proxy_test_success', true);
+                
+            } catch (\Exception $e) {
+                return redirect()->route('settings.index')
+                    ->with('proxy_test_result', 'Errore: ' . $e->getMessage())
+                    ->with('proxy_test_success', false);
+            }
+        }
+        
+        // Handle proxy list import
+        if (!empty($validated['proxy_list'])) {
+            Log::info('Processing proxy list', ['list_length' => strlen($validated['proxy_list'])]);
+            $proxyLines = explode("\n", $validated['proxy_list']);
+            $formattedProxies = [];
+            
+            // Get existing proxies
+            $existingProxies = is_array($settings->proxies) ? $settings->proxies : [];
+            Log::info('Existing proxies', ['count' => count($existingProxies)]);
+            
+            foreach ($proxyLines as $index => $line) {
+                $line = trim($line);
+                if (empty($line)) continue;
+                
+                // Handle different proxy formats
+                if (strpos($line, '@') !== false && substr_count($line, ':') >= 2) {
+                    // Format already contains @ symbol (likely username@password:host:port or similar)
+                    // Just add http:// prefix if not already present
+                    if (strpos($line, 'http://') !== 0 && strpos($line, 'https://') !== 0) {
+                        $formattedProxy = "http://{$line}";
+                    } else {
+                        $formattedProxy = $line;
+                    }
+                    $formattedProxies[] = $formattedProxy;
+                    Log::info('Formatted proxy with @ symbol', ['proxy' => $formattedProxy]);
+                } else {
+                    // Standard format: username:password:host:port
+                    $parts = explode(':', $line);
+                    Log::info('Processing proxy line', ['line' => $line, 'parts_count' => count($parts)]);
+                    
+                    if (count($parts) === 4) {
+                        $formattedProxy = "http://{$parts[0]}:{$parts[1]}@{$parts[2]}:{$parts[3]}";
+                        $formattedProxies[] = $formattedProxy;
+                        Log::info('Formatted proxy', ['proxy' => $formattedProxy]);
+                    } else {
+                        Log::warning('Invalid proxy format', ['line' => $line]);
+                    }
+                }
+            }
+            
+            Log::info('Formatted proxies', ['count' => count($formattedProxies)]);
+            
+            // Replace existing proxies instead of merging
+            $settings->proxies = $formattedProxies;
+            $settings->save();
+            
+            Log::info('Proxies saved', ['total_count' => count($settings->proxies)]);
+            
+            return redirect()->route('settings.index')
+                ->with('success', 'Importati ' . count($formattedProxies) . ' nuovi proxy.');
+        }
+        
+        $settings->save();
+        
         return redirect()->route('settings.index')
             ->with('success', 'Impostazioni aggiornate con successo.');
     }
@@ -100,5 +220,72 @@ class UserSettingsController extends Controller
             return redirect()->route('settings.index')
                 ->with('error', 'Errore: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Test a proxy connection.
+     */
+    public function testProxy(Request $request)
+    {
+        try {
+            $validated = $request->validate([
+                'proxy' => 'required|string|max:255',
+                'test_url' => 'required|url',
+            ]);
+            
+            $proxy = $validated['proxy'];
+            $testUrl = $validated['test_url'];
+            
+            $ch = curl_init($testUrl);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_PROXY, $proxy);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_HEADER, true);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+            
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = curl_error($ch);
+            curl_close($ch);
+            
+            if ($response === false) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Errore di connessione: ' . $error
+                ]);
+            }
+            
+            return response()->json([
+                'success' => true,
+                'message' => "Connessione riuscita! Codice HTTP: {$httpCode}",
+                'http_code' => $httpCode
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Errore: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Display the current proxy settings (for debugging)
+     */
+    public function dumpProxies()
+    {
+        $settings = UserSetting::where('user_id', Auth::id())->first();
+        
+        if (!$settings) {
+            return response()->json([
+                'error' => 'No settings found'
+            ], 404);
+        }
+        
+        return response()->json([
+            'proxies_type' => gettype($settings->proxies),
+            'proxies_count' => is_array($settings->proxies) ? count($settings->proxies) : 0,
+            'proxies' => $settings->proxies
+        ]);
     }
 }
