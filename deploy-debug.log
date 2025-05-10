@@ -1,0 +1,116 @@
+==== DEPLOY START Sat May 10 12:06:42 CEST 2025 ====
+User: atb
+Working dir: /Users/atb/Documents/SnipeDealPhp
+Git branch: staging
+[STEP] Controllo .env...
+[INFO] File .env già presente
+[WARNING] Controlla e modifica .env per APP_URL e DB se necessario!
+[STEP] Composer install...
+Installing dependencies from lock file
+Verifying lock file contents can be installed on current platform.
+Package operations: 0 installs, 0 updates, 36 removals
+  - Removing theseer/tokenizer (1.2.3)
+  - Removing symfony/yaml (v7.2.6)
+  - Removing staabm/side-effects-detector (1.0.5)
+  - Removing sebastian/version (5.0.2)
+  - Removing sebastian/type (5.1.2)
+  - Removing sebastian/recursion-context (6.0.2)
+  - Removing sebastian/object-reflector (4.0.1)
+  - Removing sebastian/object-enumerator (6.0.1)
+  - Removing sebastian/lines-of-code (3.0.1)
+  - Removing sebastian/global-state (7.0.2)
+  - Removing sebastian/exporter (6.3.0)
+  - Removing sebastian/environment (7.2.0)
+  - Removing sebastian/diff (6.0.2)
+  - Removing sebastian/complexity (4.0.1)
+  - Removing sebastian/comparator (6.3.1)
+  - Removing sebastian/code-unit-reverse-lookup (4.0.1)
+  - Removing sebastian/code-unit (3.0.3)
+  - Removing sebastian/cli-parser (3.0.2)
+  - Removing phpunit/phpunit (11.5.19)
+  - Removing phpunit/php-timer (7.0.1)
+  - Removing phpunit/php-text-template (4.0.1)
+  - Removing phpunit/php-invoker (5.0.1)
+  - Removing phpunit/php-file-iterator (5.1.0)
+  - Removing phpunit/php-code-coverage (11.0.9)
+  - Removing phar-io/version (3.2.1)
+  - Removing phar-io/manifest (2.0.4)
+  - Removing nunomaduro/collision (v8.8.0)
+  - Removing myclabs/deep-copy (1.13.1)
+  - Removing mockery/mockery (1.6.12)
+  - Removing laravel/sail (v1.42.0)
+  - Removing laravel/pint (v1.22.0)
+  - Removing laravel/pail (v1.2.2)
+  - Removing laravel/breeze (v2.3.6)
+  - Removing hamcrest/hamcrest-php (v2.1.1)
+  - Removing filp/whoops (2.18.0)
+  - Removing fakerphp/faker (v1.24.1)
+  0/28 [>---------------------------]   0%
+ 10/28 [==========>-----------------]  35%
+ 21/28 [=====================>------]  75%
+ 25/28 [=========================>--]  89%
+ 26/28 [==========================>-]  92%
+ 28/28 [============================] 100%
+Generating optimized autoload files
+> Illuminate\Foundation\ComposerScripts::postAutoloadDump
+> @php artisan package:discover --ansi
+
+  [37;44m INFO [39;49m Discovering packages.  
+
+  laravel/tinker [90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m [32;1mDONE[39;22m
+  nesbot/carbon [90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m [32;1mDONE[39;22m
+  nunomaduro/termwind [90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m [32;1mDONE[39;22m
+
+53 packages you are using are looking for funding.
+Use the `composer fund` command to find out more!
+[STEP] NPM install/build...
+
+added 1 package, and audited 200 packages in 2s
+
+48 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+
+> build
+> vite build
+
+vite v6.3.5 building for production...
+transforming...
+✓ 54 modules transformed.
+rendering chunks...
+computing gzip size...
+public/build/manifest.json             0.27 kB │ gzip:  0.14 kB
+public/build/assets/app-DApZf1kl.css  42.66 kB │ gzip:  7.54 kB
+public/build/assets/app-Bf4POITK.js   79.80 kB │ gzip: 29.74 kB
+✓ built in 1.11s
+[STEP] Generazione APP_KEY se mancante...
+[INFO] APP_KEY già presente
+[STEP] Controllo database sqlite...
+[INFO] database/database.sqlite già presente
+[STEP] Migrazioni...
+
+   INFO  Nothing to migrate.  
+
+[STEP] Ottimizzazione cache Laravel...
+
+   INFO  Configuration cached successfully.  
+
+
+   INFO  Routes cached successfully.  
+
+
+
+   INFO  Blade templates cached successfully.  
+
+
+   INFO  Caching framework bootstrap, configuration, and metadata.  
+
+  config .................................................................................... 10.74ms DONE
+  events ..................................................................................... 0.69ms DONE
+  routes .................................................................................... 11.66ms DONE
+  views ..................................................................................... 90.53ms DONE
+
+[STEP] Permessi...
+chown: atb: illegal group name
+[ERROR] chown fallito
