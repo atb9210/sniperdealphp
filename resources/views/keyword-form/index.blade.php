@@ -48,6 +48,13 @@
                                 <input type="checkbox" id="toggle-qso" name="qso" value="1" class="form-checkbox" @if(session('qso') || old('qso')) checked @endif>
                                 <span class="ml-2 text-sm">Ricerca specifica</span>
                             </label>
+                            
+                            @if($hasProxies)
+                            <label class="inline-flex items-center cursor-pointer ml-4">
+                                <input type="checkbox" id="toggle-proxy" name="use_proxy" value="1" class="form-checkbox" @if(session('use_proxy') || old('use_proxy')) checked @endif>
+                                <span class="ml-2 text-sm">Usa proxy ({{ $proxyCount }} disponibili)</span>
+                            </label>
+                            @endif
                         </div>
                     </form>
 
@@ -67,6 +74,53 @@
                                 <span class="ml-2 text-sm">Solo spedizione disponibile</span>
                             </label>
                         </div>
+                        
+                        @if(session('proxy_info'))
+                        <div class="mt-4 p-3 bg-gray-100 rounded-md">
+                            <h4 class="text-sm font-medium text-gray-700 mb-2">Informazioni di connessione:</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                <div>
+                                    <span class="font-medium">Utilizzo proxy:</span> 
+                                    @if(session('proxy_info.using_proxy'))
+                                        <span class="text-green-600">Attivo</span>
+                                    @else
+                                        <span class="text-gray-600">Non attivo</span>
+                                    @endif
+                                </div>
+                                @if(session('proxy_info.using_proxy') && session('proxy_info.proxy'))
+                                <div>
+                                    <span class="font-medium">Proxy:</span> 
+                                    <span class="font-mono text-xs">{{ session('proxy_info.proxy') }}</span>
+                                </div>
+                                @endif
+                                <div>
+                                    <span class="font-medium">IP locale:</span> 
+                                    <span class="font-mono">{{ session('proxy_info.local_ip') ?? 'Non disponibile' }}</span>
+                                    @if(null !== session('proxy_info.local_details') && null !== session('proxy_info.local_details.isp'))
+                                    <span class="text-xs text-gray-600 block">{{ session('proxy_info.local_details.isp') }} ({{ session('proxy_info.local_details.country') ?? '' }})</span>
+                                    @endif
+                                </div>
+                                <div>
+                                    <span class="font-medium">IP utilizzato:</span> 
+                                    <span class="font-mono">{{ session('proxy_info.proxy_ip') ?? session('proxy_info.local_ip') ?? 'Non disponibile' }}</span>
+                                    @if(session('proxy_info.using_proxy') && null !== session('proxy_info.proxy_details') && null !== session('proxy_info.proxy_details.isp'))
+                                    <span class="text-xs text-gray-600 block">{{ session('proxy_info.proxy_details.isp') }} ({{ session('proxy_info.proxy_details.country') ?? '' }})</span>
+                                    @endif
+                                    @if(session('proxy_info.using_proxy') && session('proxy_info.proxy_working'))
+                                        <span class="ml-2 text-green-600 text-xs">(Maschera confermata)</span>
+                                    @elseif(session('proxy_info.using_proxy') && !session('proxy_info.proxy_working'))
+                                        <span class="ml-2 text-red-600 text-xs">(Maschera NON funzionante!)</span>
+                                    @endif
+                                </div>
+                            </div>
+                            <div class="mt-4 text-xs text-gray-500">
+                                <p>
+                                    Nota: se l'IP utilizzato coincide con l'IP locale quando il proxy è attivo, significa che il proxy non sta funzionando correttamente.
+                                    Prova a modificare i proxy nelle <a href="{{ route('settings.index') }}" class="text-indigo-600 hover:underline">impostazioni</a>.
+                                </p>
+                            </div>
+                        </div>
+                        @endif
                     @endif
 
                     <script>

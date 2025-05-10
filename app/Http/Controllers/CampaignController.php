@@ -43,11 +43,13 @@ class CampaignController extends Controller
             'max_pages' => 'required|integer|min:1|max:10',
             'interval_minutes' => 'required|integer|min:1',
             'qso' => 'boolean',
+            'use_proxy' => 'boolean',
         ]);
 
         $validated['user_id'] = Auth::id();
         $validated['is_active'] = true;
         $validated['qso'] = $request->has('qso');
+        $validated['use_proxy'] = $request->has('use_proxy');
 
         $campaign = Campaign::create($validated);
 
@@ -98,9 +100,11 @@ class CampaignController extends Controller
             'max_pages' => 'required|integer|min:1|max:10',
             'interval_minutes' => 'required|integer|min:1',
             'qso' => 'boolean',
+            'use_proxy' => 'boolean',
         ]);
 
         $validated['qso'] = $request->has('qso');
+        $validated['use_proxy'] = $request->has('use_proxy');
 
         $campaign->update($validated);
 

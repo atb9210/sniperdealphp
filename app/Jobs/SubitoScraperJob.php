@@ -53,8 +53,18 @@ class SubitoScraperJob implements ShouldQueue
             $ads = $scraper->scrape(
                 $this->campaign->keyword, 
                 $this->campaign->qso, 
-                $this->campaign->max_pages
+                $this->campaign->max_pages,
+                $this->campaign->use_proxy
             );
+
+            // Include proxy info in logs if proxy usage was enabled
+            if ($this->campaign->use_proxy) {
+                $proxyInfo = $scraper->getProxyInfo();
+                $proxyMessage = $proxyInfo['using_proxy'] 
+                    ? "Used proxy: {$proxyInfo['proxy']}, IP: {$proxyInfo['proxy_ip']}" 
+                    : "Proxy was requested but not used";
+                Log::info($proxyMessage);
+            }
 
             if (empty($ads)) {
                 Log::warning("No ads found for campaign: {$this->campaign->name}");

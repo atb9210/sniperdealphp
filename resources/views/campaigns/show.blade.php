@@ -72,6 +72,27 @@
                         </div>
                         
                         <div>
+                            <h4 class="text-sm font-medium text-gray-500">Proxy</h4>
+                            <p class="mt-1">
+                                @if($campaign->use_proxy)
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">Abilitato</span>
+                                    @php
+                                        $userSettings = \App\Models\UserSetting::where('user_id', $campaign->user_id)->first();
+                                        $hasProxies = $userSettings && $userSettings->hasActiveProxies();
+                                        $proxyCount = $userSettings ? count($userSettings->active_proxies) : 0;
+                                    @endphp
+                                    @if(!$hasProxies)
+                                        <span class="ml-1 text-red-600 text-xs">(nessun proxy disponibile)</span>
+                                    @else
+                                        <span class="ml-1 text-green-600 text-xs">({{ $proxyCount }} disponibili)</span>
+                                    @endif
+                                @else
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Disabilitato</span>
+                                @endif
+                            </p>
+                        </div>
+                        
+                        <div>
                             <h4 class="text-sm font-medium text-gray-500">Intervallo</h4>
                             <p class="mt-1">{{ $campaign->interval_minutes }} minuti</p>
                         </div>

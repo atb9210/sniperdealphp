@@ -5,15 +5,66 @@ namespace App\Services;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use App\Services\ProxyManager;
+use Illuminate\Http\Client\PendingRequest;
 
 class SubitoScraper
 {
     protected $baseUrl = 'https://www.subito.it/annunci-italia/vendita/usato/?q=';
     protected $apiUrl = 'https://www.subito.it/api/search';
+    protected $proxyManager;
+    protected $useProxy = false;
+    protected $currentProxy = null;
+    protected $proxyIpAddress = null;
+    protected $localIpAddress = null;
 
-    public function scrape($keyword, $qso = false, $pages = 3)
+    public function __construct(ProxyManager $proxyManager = null)
     {
-        Log::info("Starting scraping for keyword: " . $keyword . ($qso ? ' (qso)' : '') . ", pagine: $pages");
+        $this->proxyManager = $proxyManager ?? new ProxyManager();
+        $this->localIpAddress = $this->proxyManager->getLocalIpAddress();
+    }
+
+    public function scrape($keyword, $qso = false, $pages = 3, $useProxy = false)
+    {
+        $this->useProxy = $useProxy;
+        
+        // Se richiesto uso di proxy ma non ce n'è uno funzionante, loggo il problema
+        if ($this->useProxy) {
+            Log::info("Richiesto utilizzo proxy per keyword: {$keyword}");
+            $this->currentProxy = $this->proxyManager->findWorkingProxy();
+            
+            if (!$this->currentProxy) {
+                Log::warning("Proxy usage requested but no working proxy found. Continuing without proxy.");
+                $this->useProxy = false;
+            } else {
+                // Test del proxy scelto per ottenere l'IP
+                Log::info("Proxy trovato, eseguo test: {$this->currentProxy}");
+                
+                // Ottiene informazioni dettagliate sull'IP del proxy
+                $ipInfo = $this->proxyManager->getDetailedIpInfo($this->currentProxy);
+                if ($ipInfo['success']) {
+                    $this->proxyIpAddress = $ipInfo['data']['query'] ?? null;
+                    $proxyIsp = $ipInfo['data']['isp'] ?? 'sconosciuto';
+                    $proxyCountry = $ipInfo['data']['country'] ?? 'sconosciuto';
+                    Log::info("Proxy IP: {$this->proxyIpAddress}, ISP: {$proxyIsp}, Paese: {$proxyCountry}");
+                } else {
+                    // Fallback al test standard
+                    $proxyTest = $this->proxyManager->testProxy($this->currentProxy);
+                    $this->proxyIpAddress = $proxyTest['ip_address'] ?? null;
+                    Log::info("Test proxy standard: IP: {$this->proxyIpAddress}");
+                }
+                
+                // Verifica che l'IP ottenuto sia differente dall'IP locale
+                if ($this->proxyIpAddress && $this->localIpAddress && 
+                    $this->proxyIpAddress === $this->localIpAddress) {
+                    Log::warning("Attenzione: l'IP del proxy ({$this->proxyIpAddress}) coincide con l'IP locale. Il proxy potrebbe non funzionare correttamente.");
+                }
+            }
+        }
+        
+        Log::info("Starting scraping for keyword: " . $keyword . ($qso ? ' (qso)' : '') . ", pagine: $pages" . 
+                 ($this->useProxy ? ", using proxy: " . $this->currentProxy : ", without proxy"));
+        
         $allAds = [];
         for ($page = 1; $page <= $pages; $page++) {
             Log::info("Scraping pagina $page di $pages");
@@ -33,12 +84,9 @@ class SubitoScraper
         try {
             Log::info("Attempting to scrape via API for keyword: " . $keyword);
             
-            $response = Http::withHeaders([
-                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                'Accept' => 'application/json',
-                'Accept-Language' => 'it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7',
-                'Referer' => 'https://www.subito.it/'
-            ])->get($this->apiUrl, [
+            $request = $this->getHttpClient();
+            
+            $response = $request->get($this->apiUrl, [
                 'q' => $keyword,
                 'limit' => 20,
                 'offset' => 0
@@ -77,13 +125,8 @@ class SubitoScraper
         Log::info("Scraping URL: " . $url);
         
         try {
-            $response = Http::withHeaders([
-                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                'Accept-Language' => 'en-US,en;q=0.5',
-                'Cache-Control' => 'no-cache',
-                'Pragma' => 'no-cache'
-            ])->get($url);
+            $request = $this->getHttpClient();
+            $response = $request->get($url);
 
             if ($response->successful()) {
                 $html = $response->body();
@@ -143,6 +186,103 @@ class SubitoScraper
             Log::error("Error scraping Subito.it: " . $e->getMessage());
             return [];
         }
+    }
+
+    /**
+     * Prepara un client HTTP con le impostazioni corrette e i proxy se necessario
+     */
+    protected function getHttpClient(): PendingRequest
+    {
+        $client = Http::withHeaders([
+            'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language' => 'en-US,en;q=0.5',
+            'Cache-Control' => 'no-cache',
+            'Pragma' => 'no-cache'
+        ]);
+        
+        // Aggiungi proxy se richiesto
+        if ($this->useProxy && $this->currentProxy) {
+            // Laravel's HTTP client non supporta direttamente proxy auth nel formato URL,
+            // quindi dobbiamo usare le curl options
+            Log::info("Configurazione proxy per HTTP client: {$this->currentProxy}");
+            
+            try {
+                // Verifica che il proxy abbia il corretto formato
+                if (strpos($this->currentProxy, '@') !== false) {
+                    // Dividi l'URL del proxy nelle sue componenti
+                    $pattern = '/^(?:http(?:s?):\/\/)?(?:([^:@]+):([^@]+)@)?([^:]+):(\d+)$/i';
+                    if (preg_match($pattern, $this->currentProxy, $matches)) {
+                        $schema = 'http://';
+                        $username = $matches[1];
+                        $password = $matches[2];
+                        $host = $matches[3];
+                        $port = $matches[4];
+                        
+                        Log::info("Proxy analizzato - Host: {$host}, Port: {$port}, User: {$username}");
+                        
+                        // Opzione 1: Usa solo curl options (più affidabile)
+                        $client->withOptions([
+                            'curl' => [
+                                CURLOPT_PROXY => "{$host}:{$port}",
+                                CURLOPT_PROXYUSERPWD => "{$username}:{$password}",
+                                CURLOPT_PROXYAUTH => CURLAUTH_BASIC,
+                                CURLOPT_FOLLOWLOCATION => 1,
+                                CURLOPT_TIMEOUT => 30
+                            ]
+                        ]);
+                        
+                        Log::info("Proxy configurato con curl options");
+                    } else {
+                        Log::warning("Formato proxy non valido: {$this->currentProxy}");
+                        $client->withOptions(['proxy' => $this->currentProxy]);
+                    }
+                } else {
+                    // Proxy semplice senza autenticazione
+                    Log::info("Configurazione proxy semplice: {$this->currentProxy}");
+                    $client->withOptions(['proxy' => $this->currentProxy]);
+                }
+            } catch (\Exception $e) {
+                Log::error("Errore configurazione proxy: " . $e->getMessage());
+                // Prosegui senza proxy in caso di errore
+            }
+        }
+        
+        return $client;
+    }
+
+    /**
+     * Restituisce informazioni sul proxy attualmente utilizzato
+     */
+    public function getProxyInfo(): array
+    {
+        // Ottieni informazioni dettagliate per l'IP del proxy
+        $proxyIpDetails = [];
+        if ($this->useProxy && $this->currentProxy) {
+            $ipInfo = $this->proxyManager->getDetailedIpInfo($this->currentProxy);
+            if ($ipInfo['success']) {
+                $proxyIpDetails = $ipInfo['data'];
+            }
+        }
+        
+        // Ottieni informazioni dettagliate per l'IP locale
+        $localIpDetails = [];
+        $ipInfo = $this->proxyManager->getDetailedIpInfo();
+        if ($ipInfo['success']) {
+            $localIpDetails = $ipInfo['data'];
+            // Aggiorna l'IP locale con quello ottenuto dal servizio
+            $this->localIpAddress = $localIpDetails['query'] ?? $this->localIpAddress;
+        }
+        
+        return [
+            'using_proxy' => $this->useProxy,
+            'proxy' => $this->currentProxy,
+            'proxy_ip' => $this->proxyIpAddress,
+            'proxy_details' => $proxyIpDetails,
+            'local_ip' => $this->localIpAddress,
+            'local_details' => $localIpDetails,
+            'proxy_working' => ($this->proxyIpAddress && $this->localIpAddress && $this->proxyIpAddress !== $this->localIpAddress)
+        ];
     }
 
     protected function extractAdsFromHtml($html)

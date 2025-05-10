@@ -66,6 +66,31 @@
                             <p class="mt-1 text-sm text-gray-500">Abilita la ricerca specifica su Subito.it.</p>
                         </div>
 
+                        @php
+                            $userSettings = \App\Models\UserSetting::where('user_id', auth()->id())->first();
+                            $hasProxies = $userSettings && $userSettings->hasActiveProxies();
+                            $proxyCount = $userSettings ? count($userSettings->active_proxies) : 0;
+                        @endphp
+
+                        <div class="block {{ !$hasProxies ? 'opacity-50' : '' }}">
+                            <label for="use_proxy" class="inline-flex items-center">
+                                <input id="use_proxy" type="checkbox" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500" 
+                                       name="use_proxy" value="1" {{ old('use_proxy') ? 'checked' : '' }} {{ !$hasProxies ? 'disabled' : '' }}>
+                                <span class="ml-2 text-sm text-gray-600">{{ __('Utilizza proxy') }}</span>
+                                @if($hasProxies)
+                                    <span class="ml-2 text-xs text-green-600">({{ $proxyCount }} disponibili)</span>
+                                @else
+                                    <span class="ml-2 text-xs text-red-600">(nessun proxy configurato)</span>
+                                @endif
+                            </label>
+                            <p class="mt-1 text-sm text-gray-500">
+                                Utilizza proxy per mascherare l'IP durante lo scraping. 
+                                @if(!$hasProxies)
+                                    <a href="{{ route('settings.index') }}" class="text-indigo-600 hover:text-indigo-900">Configura i proxy nelle impostazioni</a>.
+                                @endif
+                            </p>
+                        </div>
+
                         <div class="flex items-center justify-end mt-4">
                             <a href="{{ route('campaigns.index') }}" class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-25 transition ease-in-out duration-150 mr-3">
                                 Annulla
