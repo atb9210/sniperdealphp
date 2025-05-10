@@ -1,0 +1,3 @@
+Questo è un file di test per verificare il deployment su RunCloud.
+Data: $(date)
+Branch: testdeploy 
