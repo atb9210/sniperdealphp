@@ -23,6 +23,24 @@ const pages = parseInt(params.pages || '3', 10);
 const useProxy = params.proxy || null;
 const outputFile = params.output || path.join(__dirname, '../storage/app/temp/subito_results.json');
 
+// Timeout settings - increase timeouts when using proxy
+const timeouts = {
+  // Timeout for page navigation
+  navigation: useProxy ? 120000 : 60000, // 120 sec with proxy, 60 sec without
+  // Timeout for waiting for selectors
+  selector: useProxy ? 60000 : 30000,    // 60 sec with proxy, 30 sec without
+  // Timeout between actions to simulate human behavior
+  humanAction: {
+    min: 500,
+    max: useProxy ? 2000 : 1000          // Longer delays with proxy
+  },
+  // Timeout between page requests
+  pageRequest: {
+    min: useProxy ? 5000 : 2000,
+    max: useProxy ? 8000 : 5000
+  }
+};
+
 // Ensure output directory exists
 const outputDir = path.dirname(outputFile);
 if (!fs.existsSync(outputDir)) {
@@ -128,11 +146,12 @@ async function extractAdDetails(card) {
 async function scrapePage(page, pageNum) {
   log(`Scraping page ${pageNum}...`);
   
-  // Wait for ad cards to load
-  await page.waitForSelector('div.item-card--small', { timeout: 30000 });
+  // Wait for ad cards to load with increased timeout
+  await page.waitForSelector('div.item-card--small', { timeout: timeouts.selector });
   
-  // Add a random pause to simulate human behavior
-  await page.waitForTimeout(Math.random() * 2000 + 1000);
+  // Add a random pause to simulate human behavior - adjust based on proxy use
+  const pauseDelay = Math.random() * (timeouts.humanAction.max - timeouts.humanAction.min) + timeouts.humanAction.min;
+  await page.waitForTimeout(pauseDelay);
   
   // Perform some random scrolling to mimic human behavior
   await page.evaluate(() => {
@@ -140,7 +159,8 @@ async function scrapePage(page, pageNum) {
     window.scrollBy(0, scrollAmount);
   });
   
-  await page.waitForTimeout(Math.random() * 1000 + 500);
+  // Another pause after scrolling
+  await page.waitForTimeout(Math.random() * (timeouts.humanAction.max/2) + timeouts.humanAction.min);
   
   // Simulate human mouse movement
   await humanMouseMovement(page);
@@ -261,10 +281,10 @@ async function main() {
       
       log(`Navigating to page ${pageNum}: ${pageUrl}`);
       
-      // Navigate to the URL
+      // Navigate to the URL with increased timeout when using proxy
       const response = await page.goto(pageUrl, {
         waitUntil: 'networkidle2',
-        timeout: 60000
+        timeout: timeouts.navigation
       });
       
       if (!response || !response.ok()) {
@@ -292,9 +312,9 @@ async function main() {
       
       log(`Total ads after page ${pageNum}: ${allAds.length}`);
       
-      // Random delay between page requests
+      // Random delay between page requests - longer when using proxy
       if (pageNum < pages) {
-        const delay = Math.random() * 3000 + 2000;
+        const delay = Math.random() * (timeouts.pageRequest.max - timeouts.pageRequest.min) + timeouts.pageRequest.min;
         log(`Waiting ${Math.round(delay)}ms before loading next page...`);
         await page.waitForTimeout(delay);
       }

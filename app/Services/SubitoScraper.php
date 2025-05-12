@@ -126,7 +126,10 @@ class SubitoScraper
         
         // Create and configure the process
         $process = new Process($args);
-        $process->setTimeout(300); // 5 minutes timeout
+        
+        // Imposta un timeout più lungo quando si usa un proxy
+        $timeout = $this->useProxy ? 600 : 300; // 10 minuti con proxy, 5 minuti senza
+        $process->setTimeout($timeout);
         
         try {
             Log::info("Starting Puppeteer process: " . implode(' ', $args));
@@ -266,8 +269,14 @@ class SubitoScraper
             'Pragma' => 'no-cache'
         ]);
         
+        // Aumenta il timeout di base (5 secondi di default in Laravel)
+        $timeout = 30; // 30 secondi di timeout standard
+        
         // Aggiungi proxy se richiesto
         if ($this->useProxy && $this->currentProxy) {
+            // Quando si usa il proxy, aumentiamo ulteriormente il timeout
+            $timeout = 60; // 60 secondi quando si usa il proxy
+            
             // Laravel's HTTP client non supporta direttamente proxy auth nel formato URL,
             // quindi dobbiamo usare le curl options
             Log::info("Configurazione proxy per HTTP client: {$this->currentProxy}");
@@ -293,24 +302,35 @@ class SubitoScraper
                                 CURLOPT_PROXYUSERPWD => "{$username}:{$password}",
                                 CURLOPT_PROXYAUTH => CURLAUTH_BASIC,
                                 CURLOPT_FOLLOWLOCATION => 1,
-                                CURLOPT_TIMEOUT => 30
+                                CURLOPT_TIMEOUT => $timeout,
+                                CURLOPT_CONNECTTIMEOUT => 30
                             ]
                         ]);
                         
                         Log::info("Proxy configurato con curl options");
                     } else {
                         Log::warning("Formato proxy non valido: {$this->currentProxy}");
-                        $client->withOptions(['proxy' => $this->currentProxy]);
+                        $client->withOptions([
+                            'proxy' => $this->currentProxy,
+                            'timeout' => $timeout
+                        ]);
                     }
                 } else {
                     // Proxy semplice senza autenticazione
                     Log::info("Configurazione proxy semplice: {$this->currentProxy}");
-                    $client->withOptions(['proxy' => $this->currentProxy]);
+                    $client->withOptions([
+                        'proxy' => $this->currentProxy,
+                        'timeout' => $timeout
+                    ]);
                 }
             } catch (\Exception $e) {
                 Log::error("Errore configurazione proxy: " . $e->getMessage());
-                // Prosegui senza proxy in caso di errore
+                // Prosegui senza proxy in caso di errore, ma mantieni il timeout più alto
+                $client->timeout($timeout);
             }
+        } else {
+            // Senza proxy, usa il timeout standard
+            $client->timeout($timeout);
         }
         
         return $client;
