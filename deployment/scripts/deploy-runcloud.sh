@@ -37,6 +37,10 @@ fi
 npm install || { echo "[ERROR] npm install fallito"; exit 1; }
 npm run build || { echo "[ERROR] npm run build fallito"; exit 1; }
 
+# 4.5 Setup Puppeteer
+echo "[STEP] Configurazione Puppeteer..."
+bash "$(dirname "$0")/deploy-puppeteer.sh" || { echo "[ERROR] Puppeteer setup fallito"; exit 1; }
+
 # 5. Genera chiave se mancante
 echo "[STEP] Generazione APP_KEY se mancante..."
 if ! grep -q "APP_KEY=base64" .env; then
@@ -72,6 +76,11 @@ php artisan optimize || { echo "[ERROR] optimize fallito"; exit 1; }
 echo "[STEP] Permessi..."
 chmod -R 775 storage bootstrap/cache || { echo "[ERROR] chmod fallito"; exit 1; }
 chown -R $(whoami):$(whoami) storage bootstrap/cache || { echo "[ERROR] chown fallito"; exit 1; }
+
+# 9.5 Crea cartelle temporanee per Puppeteer
+echo "[STEP] Creazione cartelle temporanee per Puppeteer..."
+mkdir -p storage/app/temp
+chmod -R 775 storage/app/temp
 
 # 10. Fine deploy
 echo "==== DEPLOY COMPLETATO con successo $(date) ====" 

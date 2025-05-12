@@ -17,7 +17,7 @@ Un'applicazione Laravel per il monitoraggio automatico e l'analisi degli annunci
 - Pianificazione automatica delle esecuzioni
 
 ### 2. Scraping degli Annunci
-- Ricerca annunci per keyword
+- Ricerca annunci per keyword tramite Puppeteer (avanzato anti-bot)
 - Supporto per ricerca specifica (qso=true)
 - Paginazione automatica (fino a 10 pagine)
 - Estrazione dettagliata per ogni annuncio:
@@ -29,6 +29,8 @@ Un'applicazione Laravel per il monitoraggio automatico e l'analisi degli annunci
   - Immagine
   - Stato (Disponibile/Venduto)
   - Disponibilità spedizione
+- Simulazione comportamento umano (movimenti mouse, scroll, ritardi realistici)
+- Opzione per utilizzare proxy per evitare blocchi
 
 ### 3. Notifiche e Monitoraggio
 - Notifiche Telegram per nuovi annunci
@@ -75,8 +77,40 @@ Un'applicazione Laravel per il monitoraggio automatico e l'analisi degli annunci
 
 ### Services
 - `SubitoScraper`: Servizio principale per lo scraping
-  - `scrape($keyword, $qso, $pages)`: Metodo principale che coordina lo scraping
+  - `scrape($keyword, $qso, $pages, $useProxy)`: Metodo principale che coordina lo scraping
+  - `scrapeViaPuppeteer($keyword, $qso, $pages)`: Metodo che utilizza Puppeteer per lo scraping
+  - `scrapeViaHtml($keyword, $qso, $page)`: Metodo di fallback basato su HTML
   - Funzioni di supporto per l'estrazione dei dati
+
+### Node.js Scripts
+- `node/subito_scraper.js`: Script Puppeteer per lo scraping avanzato
+  - Simulazione comportamento umano
+  - Bypass delle misure anti-bot
+  - Estrazione dati affidabile
+
+## Sistema di Scraping con Puppeteer
+
+L'applicazione utilizza Puppeteer per eseguire uno scraping avanzato di Subito.it, superando le misure anti-bot:
+
+- Tecniche anti-rilevamento del browser
+- Simulazione movimenti mouse e scroll 
+- Digitazione con ritardi casuali simili a quelli umani
+- Intervalli variabili tra le richieste
+- Possibilità di utilizzare proxy per evitare blocchi per IP
+
+### Setup e Configurazione
+
+Per ulteriori dettagli sull'installazione e configurazione di Puppeteer, consulta:
+- `deployment/docs/PUPPETEER.md`: Documentazione completa su Puppeteer
+- `deployment/scripts/deploy-puppeteer.sh`: Script per installazione automatica delle dipendenze
+
+### Requisiti di Sistema per Puppeteer
+
+- Node.js ≥ 20.x
+- NPM ≥ 10.x
+- Ubuntu ≥ 20.04 (consigliato)
+- Almeno 2GB di RAM
+- Dipendenze di sistema per Chrome (installate automaticamente dagli script di deployment)
 
 ## Sistema di Code e Job
 
