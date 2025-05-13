@@ -38,23 +38,46 @@ class ProxyManager
     public function getRoundRobinProxy(?int $userId = null): ?string
     {
         $settings = $this->getUserSettings($userId);
-        if (!$settings || !$settings->hasActiveProxies()) {
+        if (!$settings) {
+            Log::info("getRoundRobinProxy: No settings found for user");
+            return null;
+        }
+        
+        if (!$settings->hasActiveProxies()) {
+            Log::info("getRoundRobinProxy: User has no active proxies");
             return null;
         }
 
         $proxies = $settings->active_proxies;
         if (empty($proxies)) {
+            Log::info("getRoundRobinProxy: Active proxies array is empty");
             return null;
         }
 
-        // Get the last used index from session or start with 0
-        $lastIndex = session('proxy_last_index', -1);
+        Log::info("getRoundRobinProxy: Found " . count($proxies) . " active proxies");
+        
+        // Usa un file per memorizzare l'indice invece della sessione
+        $indexFile = storage_path('app/proxy_index.txt');
+        $lastIndex = -1;
+        
+        if (file_exists($indexFile)) {
+            $lastIndex = (int) file_get_contents($indexFile);
+            Log::info("getRoundRobinProxy: Last index from file: " . $lastIndex);
+        } else {
+            Log::info("getRoundRobinProxy: No index file found, starting from -1");
+        }
+        
         $newIndex = ($lastIndex + 1) % count($proxies);
+        Log::info("getRoundRobinProxy: New index: " . $newIndex);
         
-        // Store the new index for next time
-        session(['proxy_last_index' => $newIndex]);
+        // Salva il nuovo indice nel file
+        file_put_contents($indexFile, $newIndex);
+        Log::info("getRoundRobinProxy: Stored new index in file: " . $newIndex);
         
-        return $proxies[$newIndex];
+        $selectedProxy = $proxies[$newIndex];
+        Log::info("getRoundRobinProxy: Selected proxy: " . $selectedProxy);
+        
+        return $selectedProxy;
     }
 
     /**
@@ -85,7 +108,26 @@ class ProxyManager
                 curl_setopt($ch, CURLOPT_TIMEOUT, 15);
                 curl_setopt($ch, CURLOPT_HEADER, true);
                 curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-                curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+                
+                // Sostituisco il vecchio User-Agent con gli header completi dello scraper
+                curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                    'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                    'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+                    'Accept-Language: it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7',
+                    'Accept-Encoding: gzip, deflate, br',
+                    'Cache-Control: no-cache',
+                    'Pragma: no-cache',
+                    'Sec-Ch-Ua: "Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
+                    'Sec-Ch-Ua-Mobile: ?0',
+                    'Sec-Ch-Ua-Platform: "Windows"',
+                    'Sec-Fetch-Dest: document',
+                    'Sec-Fetch-Mode: navigate',
+                    'Sec-Fetch-Site: none',
+                    'Sec-Fetch-User: ?1',
+                    'Upgrade-Insecure-Requests: 1',
+                    'Connection: keep-alive',
+                    'DNT: 1'
+                ]);
                 
                 $response = curl_exec($ch);
                 $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -303,12 +345,20 @@ class ProxyManager
      */
     protected function getUserSettings(?int $userId = null): ?UserSetting
     {
-        $userId = $userId ?? Auth::id();
+        $userId = $userId ?? Auth::id() ?? 1; // Fallback to user ID 1 if not authenticated
         if (!$userId) {
+            Log::warning("getUserSettings: No user ID provided and no authenticated user");
             return null;
         }
         
-        return UserSetting::where('user_id', $userId)->first();
+        Log::info("getUserSettings: Getting settings for user ID: " . $userId);
+        $settings = UserSetting::where('user_id', $userId)->first();
+        
+        if (!$settings) {
+            Log::warning("getUserSettings: No settings found for user ID: " . $userId);
+        }
+        
+        return $settings;
     }
 
     /**

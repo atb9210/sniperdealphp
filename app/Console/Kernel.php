@@ -4,6 +4,7 @@ namespace App\Console;
 
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
+use Illuminate\Support\Facades\Log;
 
 class Kernel extends ConsoleKernel
 {
@@ -23,14 +24,12 @@ class Kernel extends ConsoleKernel
         // Ora che usa dispatchSync le notifiche verranno inviate immediatamente
         $schedule->command('campaigns:run')
             ->everyMinute()
-            ->withoutOverlapping(5)
-            ->appendOutputTo(storage_path('logs/scheduler.log'))
-            ->onSuccess(function () {
-                info('Scheduler: campaigns:run eseguito con successo');
-            })
-            ->onFailure(function () {
-                info('Scheduler: campaigns:run fallito');
-            });
+            ->appendOutputTo(storage_path('logs/scheduler.log'));
+
+        // Aggiungo un log per debug
+        $schedule->call(function () {
+            Log::info('Scheduler è attivo e funzionante!');
+        })->everyMinute();
     }
 
     /**
@@ -38,7 +37,7 @@ class Kernel extends ConsoleKernel
      *
      * @return void
      */
-    protected function commands(): void
+    protected function commands()
     {
         $this->load(__DIR__.'/Commands');
 

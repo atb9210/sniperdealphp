@@ -2,7 +2,16 @@
 
 set -e
 
-LOG="../logs/deploy-debug.log"
+# Assicurati di essere nella directory principale del progetto
+if [[ "$(basename $(pwd))" == "scripts" || "$(basename $(pwd))" == "deployment" ]]; then
+  echo "[INFO] Cambio directory alla root del progetto..."
+  cd $(dirname $(dirname $(pwd)))
+fi
+
+# Crea directory logs se non esiste
+mkdir -p deployment/logs
+
+LOG="deployment/logs/deploy-debug.log"
 exec > >(tee -a "$LOG") 2>&1
 
 echo "==== DEPLOY START $(date) ===="
@@ -39,25 +48,12 @@ npm run build || { echo "[ERROR] npm run build fallito"; exit 1; }
 
 # 5. Genera chiave se mancante
 echo "[STEP] Generazione APP_KEY se mancante..."
-# Assicuriamoci che siamo nella directory principale del progetto
-cd "$(dirname "$0")/../.." || { echo "[ERROR] Cambio directory fallito"; exit 1; }
 if ! grep -q "APP_KEY=base64" .env; then
-  php artisan key:generate --force || { echo "[ERROR] key:generate fallito"; exit 1; }
+  php artisan key:generate || { echo "[ERROR] key:generate fallito"; exit 1; }
   echo "[INFO] APP_KEY generata"
 else
   echo "[INFO] APP_KEY già presente"
-  # Verifichiamo che la chiave sia valida
-  KEY_VALUE=$(grep APP_KEY .env | cut -d '=' -f 2)
-  if [[ -z "$KEY_VALUE" || "$KEY_VALUE" == "base64:" ]]; then
-    echo "[WARNING] APP_KEY presente ma sembra non valida, rigeneriamo..."
-    php artisan key:generate --force || { echo "[ERROR] key:generate fallito"; exit 1; }
-    echo "[INFO] APP_KEY rigenerata"
-  fi
 fi
-
-# 5.5 Setup Puppeteer (spostato dopo la generazione della chiave)
-echo "[STEP] Configurazione Puppeteer..."
-bash "$(dirname "$0")/deploy-puppeteer.sh" || { echo "[ERROR] Puppeteer setup fallito"; exit 1; }
 
 # 6. Crea database sqlite se serve
 echo "[STEP] Controllo database sqlite..."
@@ -76,13 +72,6 @@ php artisan migrate --force || { echo "[ERROR] migrate fallito"; exit 1; }
 
 # 8. Ottimizzazione cache
 echo "[STEP] Ottimizzazione cache Laravel..."
-# Pulisce eventuali cache precedenti
-php artisan config:clear || { echo "[WARNING] config:clear warning"; }
-php artisan route:clear || { echo "[WARNING] route:clear warning"; }
-php artisan view:clear || { echo "[WARNING] view:clear warning"; }
-php artisan cache:clear || { echo "[WARNING] cache:clear warning"; }
-
-# Ora rigenera le cache
 php artisan config:cache || { echo "[ERROR] config:cache fallito"; exit 1; }
 php artisan route:cache || { echo "[ERROR] route:cache fallito"; exit 1; }
 php artisan view:cache || { echo "[ERROR] view:cache fallito"; exit 1; }
@@ -90,20 +79,58 @@ php artisan optimize || { echo "[ERROR] optimize fallito"; exit 1; }
 
 # 9. Permessi
 echo "[STEP] Permessi..."
-chmod -R 775 storage bootstrap/cache || { echo "[ERROR] chmod fallito"; exit 1; }
-chown -R $(whoami):$(whoami) storage bootstrap/cache || { echo "[ERROR] chown fallito"; exit 1; }
+# Crea i file di log se non esistono
+mkdir -p storage/logs
+sudo touch storage/logs/scheduler.log storage/logs/worker.log || { echo "[WARNING] Impossibile creare file di log"; }
 
-# 9.5 Crea cartelle temporanee per Puppeteer
-echo "[STEP] Creazione cartelle temporanee per Puppeteer..."
-mkdir -p storage/app/temp
-chmod -R 775 storage/app/temp
+# Imposta i permessi in modo sicuro
+sudo chmod -R 775 storage bootstrap/cache || { echo "[WARNING] chmod fallito, proseguo comunque"; }
+sudo chown -R $(whoami):$(whoami) storage bootstrap/cache || { echo "[WARNING] chown fallito, proseguo comunque"; }
 
-# 10. Verifica finale
-echo "[STEP] Verifica finale configurazione..."
-if ! grep -q "APP_KEY=base64" .env || grep -q "APP_KEY=base64:" .env; then
-  echo "[WARNING] APP_KEY non trovata o non valida dopo il deploy, tentativo finale..."
-  php artisan key:generate --force
+# 10. Configurazione Supervisor
+echo "[STEP] Configurazione Supervisor..."
+if [ -d "supervisor" ]; then
+  # Aggiorna i percorsi nei file di configurazione
+  PROJECT_PATH=$(pwd)
+  USER=$(whoami)
+  
+  echo "[INFO] Aggiornamento configurazioni supervisor..."
+  sed -i.bak "s|/Users/atb/Documents/SnipeDealPhp|$PROJECT_PATH|g" supervisor/*.conf
+  sed -i.bak "s|user=atb|user=$USER|g" supervisor/*.conf
+  
+  # Copia i file di configurazione nella posizione corretta
+  echo "[INFO] Copiando file di configurazione in /etc/supervisor/conf.d/"
+  sudo mkdir -p /etc/supervisor/conf.d/
+  sudo cp supervisor/*.conf /etc/supervisor/conf.d/
+  
+  # Riavvia supervisor
+  echo "[INFO] Riavvio supervisor..."
+  sudo supervisorctl reread
+  sudo supervisorctl update
+  
+  echo "[INFO] Configurazione Supervisor completata"
+else
+  echo "[WARNING] Directory supervisor non trovata, configurazione supervisor saltata"
 fi
 
-# 11. Fine deploy
+# 11. Riavvio queue worker
+echo "[STEP] Riavvio queue worker..."
+php artisan queue:restart || { echo "[WARNING] queue:restart fallito, ma proseguo"; }
+echo "[INFO] Queue worker riavviato"
+
+# 12. Avvio servizi
+echo "[STEP] Avvio servizi..."
+# Ferma tutti i servizi
+echo "[INFO] Fermando tutti i servizi..."
+sudo supervisorctl stop all || { echo "[WARNING] Impossibile fermare i servizi, proseguo comunque"; }
+
+# Avvia tutti i servizi
+echo "[INFO] Avviando tutti i servizi..."
+sudo supervisorctl start all || { echo "[WARNING] Impossibile avviare i servizi, proseguo comunque"; }
+
+# Mostra lo stato dei servizi
+echo "[INFO] Stato dei servizi:"
+sudo supervisorctl status
+
+# 13. Fine deploy
 echo "==== DEPLOY COMPLETATO con successo $(date) ====" 

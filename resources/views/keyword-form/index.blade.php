@@ -54,6 +54,7 @@
                                 <input type="checkbox" id="toggle-proxy" name="use_proxy" value="1" class="form-checkbox" @if(session('use_proxy') || old('use_proxy')) checked @endif>
                                 <span class="ml-2 text-sm">Usa proxy ({{ $proxyCount }} disponibili)</span>
                             </label>
+                            <div id="proxy-test-result" class="hidden mt-2 p-2 rounded text-sm"></div>
                             @endif
                         </div>
                     </form>
@@ -128,6 +129,81 @@
                             document.getElementById('search-btn').disabled = true;
                             document.getElementById('loading-spinner').classList.remove('hidden');
                         });
+
+                        // Gestione test proxy
+                        const proxyToggle = document.getElementById('toggle-proxy');
+                        const proxyTestResult = document.getElementById('proxy-test-result');
+                        
+                        if (proxyToggle) {
+                            proxyToggle.addEventListener('change', async function() {
+                                if (this.checked) {
+                                    proxyTestResult.innerHTML = '<div class="flex items-center"><svg class="animate-spin h-4 w-4 text-gray-600 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg> Test proxy in corso...</div>';
+                                    proxyTestResult.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'bg-green-100', 'text-green-700');
+                                    proxyTestResult.classList.add('bg-gray-100', 'text-gray-700');
+                                    
+                                    try {
+                                        const response = await fetch('{{ route("settings.test-proxy") }}', {
+                                            method: 'POST',
+                                            headers: {
+                                                'Content-Type': 'application/json',
+                                                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                                            },
+                                            body: JSON.stringify({
+                                                test_url: 'https://subito.it'
+                                            })
+                                        });
+                                        
+                                        const data = await response.json();
+                                        
+                                        if (data.success) {
+                                            proxyTestResult.innerHTML = `
+                                                <div class="text-green-700">
+                                                    <div class="font-medium">✓ ${data.message}</div>
+                                                    <div class="text-xs mt-1">IP Proxy: ${data.ip_address || 'N/A'}</div>
+                                                    <div class="text-xs">IP Locale: ${data.local_ip || 'N/A'}</div>
+                                                    <div class="text-xs">HTTP: ${data.http_code}</div>
+                                                </div>
+                                            `;
+                                            proxyTestResult.classList.remove('bg-gray-100', 'text-gray-700', 'bg-red-100', 'text-red-700');
+                                            proxyTestResult.classList.add('bg-green-100', 'text-green-700');
+                                        } else {
+                                            proxyTestResult.innerHTML = `
+                                                <div class="text-red-700">
+                                                    <div class="font-medium">✗ ${data.message}</div>
+                                                    <div class="text-xs mt-1">IP Proxy: ${data.ip_address || 'N/A'}</div>
+                                                    <div class="text-xs">IP Locale: ${data.local_ip || 'N/A'}</div>
+                                                    <div class="text-xs">HTTP: ${data.http_code}</div>
+                                                </div>
+                                            `;
+                                            proxyTestResult.classList.remove('bg-gray-100', 'text-gray-700', 'bg-green-100', 'text-green-700');
+                                            proxyTestResult.classList.add('bg-red-100', 'text-red-700');
+                                            
+                                            // Disabilita il checkbox se il test fallisce
+                                            this.checked = false;
+                                        }
+                                    } catch (error) {
+                                        proxyTestResult.innerHTML = `
+                                            <div class="text-red-700">
+                                                <div class="font-medium">✗ Errore test proxy</div>
+                                                <div class="text-xs mt-1">${error.message}</div>
+                                            </div>
+                                        `;
+                                        proxyTestResult.classList.remove('bg-gray-100', 'text-gray-700', 'bg-green-100', 'text-green-700');
+                                        proxyTestResult.classList.add('bg-red-100', 'text-red-700');
+                                        
+                                        // Disabilita il checkbox se il test fallisce
+                                        this.checked = false;
+                                    }
+                                } else {
+                                    proxyTestResult.classList.add('hidden');
+                                }
+                            });
+                            
+                            // Esegui il test iniziale se il checkbox è già attivo
+                            if (proxyToggle.checked) {
+                                proxyToggle.dispatchEvent(new Event('change'));
+                            }
+                        }
                     </script>
 
                     <!-- Scraped Ads Section -->

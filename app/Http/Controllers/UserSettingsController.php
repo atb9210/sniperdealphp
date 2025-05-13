@@ -229,37 +229,56 @@ class UserSettingsController extends Controller
     {
         try {
             $validated = $request->validate([
-                'proxy' => 'required|string|max:255',
                 'test_url' => 'required|url',
             ]);
             
-            $proxy = $validated['proxy'];
             $testUrl = $validated['test_url'];
             
-            $ch = curl_init($testUrl);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_PROXY, $proxy);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-            curl_setopt($ch, CURLOPT_HEADER, true);
-            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-            curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+            // Usa il ProxyManager per testare un proxy casuale
+            $proxyManager = new \App\Services\ProxyManager();
+            $proxy = $proxyManager->getRandomProxy();
             
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $error = curl_error($ch);
-            curl_close($ch);
-            
-            if ($response === false) {
+            if (!$proxy) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Errore di connessione: ' . $error
+                    'message' => 'Nessun proxy disponibile'
+                ]);
+            }
+            
+            // Prima ottieni l'IP locale
+            $localIp = $proxyManager->getLocalIpAddress();
+            
+            // Testa il proxy
+            $result = $proxyManager->testProxy($proxy, $testUrl);
+            
+            // Se il test ha successo ma l'IP non è cambiato, il proxy non sta funzionando
+            if ($result['success'] && $result['ip_address'] === $localIp) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Il proxy non sta mascherando l\'IP (IP locale e proxy coincidono)',
+                    'http_code' => $result['http_code'],
+                    'ip_address' => $result['ip_address'],
+                    'local_ip' => $localIp
+                ]);
+            }
+            
+            // Se il codice è 403 ma l'IP è cambiato, consideriamo il test riuscito
+            if ($result['http_code'] === 403 && $result['ip_address'] !== $localIp) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Proxy funzionante (IP mascherato correttamente)',
+                    'http_code' => $result['http_code'],
+                    'ip_address' => $result['ip_address'],
+                    'local_ip' => $localIp
                 ]);
             }
             
             return response()->json([
-                'success' => true,
-                'message' => "Connessione riuscita! Codice HTTP: {$httpCode}",
-                'http_code' => $httpCode
+                'success' => $result['success'],
+                'message' => $result['message'],
+                'http_code' => $result['http_code'],
+                'ip_address' => $result['ip_address'],
+                'local_ip' => $localIp
             ]);
         } catch (\Exception $e) {
             return response()->json([

@@ -7,9 +7,6 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use App\Services\ProxyManager;
 use Illuminate\Http\Client\PendingRequest;
-use Symfony\Component\Process\Process;
-use Symfony\Component\Process\Exception\ProcessFailedException;
-use Illuminate\Support\Facades\File;
 
 class SubitoScraper
 {
@@ -20,38 +17,29 @@ class SubitoScraper
     protected $currentProxy = null;
     protected $proxyIpAddress = null;
     protected $localIpAddress = null;
-    protected $nodeScriptPath;
-    protected $tempDir;
 
     public function __construct(ProxyManager $proxyManager = null)
     {
         $this->proxyManager = $proxyManager ?? new ProxyManager();
         $this->localIpAddress = $this->proxyManager->getLocalIpAddress();
-        $this->nodeScriptPath = base_path('node/subito_scraper.js');
-        $this->tempDir = storage_path('app/temp');
-        
-        // Ensure temp directory exists
-        if (!File::exists($this->tempDir)) {
-            File::makeDirectory($this->tempDir, 0755, true);
-        }
     }
 
-    public function scrape($keyword, $qso = false, $pages = 3, $useProxy = false)
+    public function scrape($keyword, $qso = false, $pages = 3, $useProxy = false, $forcedProxy = null)
     {
         $this->useProxy = $useProxy;
-        
-        // Prepara il proxy se richiesto
-        if ($this->useProxy) {
+        if ($forcedProxy) {
+            $this->currentProxy = $forcedProxy;
+            $this->useProxy = true;
+            Log::info("Forzato utilizzo proxy: {$forcedProxy}");
+        } else if ($this->useProxy) {
             Log::info("Richiesto utilizzo proxy per keyword: {$keyword}");
-            $this->currentProxy = $this->proxyManager->findWorkingProxy();
-            
+            $this->currentProxy = $this->proxyManager->getRoundRobinProxy();
             if (!$this->currentProxy) {
-                Log::warning("Proxy usage requested but no working proxy found. Continuing without proxy.");
+                Log::warning("Proxy usage requested but no proxies found. Continuing without proxy.");
                 $this->useProxy = false;
             } else {
                 // Test del proxy scelto per ottenere l'IP
-                Log::info("Proxy trovato, eseguo test: {$this->currentProxy}");
-                
+                Log::info("Proxy selezionato (round-robin): {$this->currentProxy}");
                 // Ottiene informazioni dettagliate sull'IP del proxy
                 $ipInfo = $this->proxyManager->getDetailedIpInfo($this->currentProxy);
                 if ($ipInfo['success']) {
@@ -65,7 +53,6 @@ class SubitoScraper
                     $this->proxyIpAddress = $proxyTest['ip_address'] ?? null;
                     Log::info("Test proxy standard: IP: {$this->proxyIpAddress}");
                 }
-                
                 // Verifica che l'IP ottenuto sia differente dall'IP locale
                 if ($this->proxyIpAddress && $this->localIpAddress && 
                     $this->proxyIpAddress === $this->localIpAddress) {
@@ -73,114 +60,75 @@ class SubitoScraper
                 }
             }
         }
-        
-        Log::info("Starting scraping using Puppeteer for keyword: " . $keyword . ($qso ? ' (qso)' : '') . ", pagine: $pages" . 
+        Log::info("Starting scraping for keyword: " . $keyword . ($qso ? ' (qso)' : '') . ", pagine: $pages" . 
                  ($this->useProxy ? ", using proxy: " . $this->currentProxy : ", without proxy"));
-
-        try {
-            return $this->scrapeViaPuppeteer($keyword, $qso, $pages);
-        } catch (\Exception $e) {
-            Log::error("Error scraping with Puppeteer: " . $e->getMessage());
-            Log::warning("Falling back to HTML scraping method...");
+        $allAds = [];
+        for ($page = 1; $page <= $pages; $page++) {
+            Log::info("Scraping pagina $page di $pages");
+            $ads = $this->scrapeViaHtml($keyword, $qso, $page);
+            Log::info("Pagina $page: trovati " . count($ads) . " annunci");
+            if (!empty($ads)) {
+                $allAds = array_merge($allAds, $ads);
+                Log::info("Totale annunci dopo pagina $page: " . count($allAds));
+            }
+        }
+        
+        // Se non abbiamo trovato annunci e stavamo usando un proxy, riprova senza proxy
+        if (empty($allAds) && $this->useProxy) {
+            Log::warning("Nessun annuncio trovato con proxy. Riprovo senza proxy.");
+            $this->useProxy = false;
+            $this->currentProxy = null;
             
-            // Fallback al vecchio metodo in caso di errore
-            $allAds = [];
+            Log::info("Restarting scraping without proxy for keyword: " . $keyword . ($qso ? ' (qso)' : '') . ", pagine: $pages");
             for ($page = 1; $page <= $pages; $page++) {
-                Log::info("Scraping pagina $page di $pages");
+                Log::info("Scraping pagina $page di $pages (senza proxy)");
                 $ads = $this->scrapeViaHtml($keyword, $qso, $page);
-                Log::info("Pagina $page: trovati " . count($ads) . " annunci");
+                Log::info("Pagina $page: trovati " . count($ads) . " annunci (senza proxy)");
                 if (!empty($ads)) {
                     $allAds = array_merge($allAds, $ads);
-                    Log::info("Totale annunci dopo pagina $page: " . count($allAds));
+                    Log::info("Totale annunci dopo pagina $page: " . count($allAds) . " (senza proxy)");
                 }
             }
-            Log::info("Scraping completato. Totale annunci trovati: " . count($allAds));
-            return $allAds;
         }
+        
+        Log::info("Scraping completato. Totale annunci trovati: " . count($allAds));
+        return $allAds;
     }
 
-    /**
-     * Scrape Subito.it using Puppeteer with anti-bot techniques
-     */
-    protected function scrapeViaPuppeteer($keyword, $qso = false, $pages = 3)
+    protected function scrapeViaApi($keyword)
     {
-        Log::info("Executing Puppeteer scraper script...");
-        
-        // Prepare output file path
-        $outputFile = $this->tempDir . '/subito_results_' . time() . '.json';
-        
-        // Build command arguments
-        $args = [
-            'node',
-            $this->nodeScriptPath,
-            '--keyword=' . escapeshellarg($keyword),
-            '--qso=' . ($qso ? 'true' : 'false'),
-            '--pages=' . $pages,
-            '--output=' . $outputFile
-        ];
-        
-        // Add proxy if enabled
-        if ($this->useProxy && $this->currentProxy) {
-            $args[] = '--proxy=' . escapeshellarg($this->currentProxy);
-        }
-        
-        // Create and configure the process
-        $process = new Process($args);
-        
-        // Imposta un timeout più lungo quando si usa un proxy
-        $timeout = $this->useProxy ? 600 : 300; // 10 minuti con proxy, 5 minuti senza
-        $process->setTimeout($timeout);
-        
         try {
-            Log::info("Starting Puppeteer process: " . implode(' ', $args));
-            $process->run();
+            Log::info("Attempting to scrape via API for keyword: " . $keyword);
             
-            // Check if process was successful
-            if (!$process->isSuccessful()) {
-                throw new ProcessFailedException($process);
-            }
+            $request = $this->getHttpClient();
             
-            // Get process output
-            $output = $process->getOutput();
-            Log::info("Puppeteer script output: " . $output);
+            $response = $request->get($this->apiUrl, [
+                'q' => $keyword,
+                'limit' => 20,
+                'offset' => 0
+            ]);
+
+            Log::info("API Response status: " . $response->status());
             
-            // Read results from output file
-            if (File::exists($outputFile)) {
-                $jsonData = File::get($outputFile);
-                $results = json_decode($jsonData, true);
-                
-                if (json_last_error() !== JSON_ERROR_NONE) {
-                    throw new \Exception("Error decoding JSON results: " . json_last_error_msg());
+            if ($response->successful()) {
+                $data = $response->json();
+                if ($data === null) {
+                    Log::warning("API returned null data");
+                    return [];
                 }
                 
-                Log::info("Successfully parsed " . count($results) . " results from Puppeteer");
-                
-                // Clean up the output file
-                File::delete($outputFile);
-                
-                return $results;
-            } else {
-                throw new \Exception("Output file not found: {$outputFile}");
+                Log::info("API Response data structure: " . json_encode(array_keys($data)));
+                return $this->processApiResponse($data);
             }
+
+            Log::warning("API request failed with status: " . $response->status());
+            return [];
         } catch (\Exception $e) {
-            Log::error("Error running Puppeteer script: " . $e->getMessage());
-            
-            // Check for debugging files
-            $debugHtmlPath = $this->tempDir . '/subito_page.html';
-            if (File::exists($debugHtmlPath)) {
-                Log::info("Debug HTML file available at: {$debugHtmlPath}");
-            }
-            
-            $captchaPath = $this->tempDir . '/captcha.png';
-            if (File::exists($captchaPath)) {
-                Log::error("CAPTCHA detected! Screenshot saved at: {$captchaPath}");
-            }
-            
-            throw $e;
+            Log::error("API scraping error: " . $e->getMessage());
+            return [];
         }
     }
 
-    // Keeping the existing scrapeViaHtml method as a fallback
     protected function scrapeViaHtml($keyword, $qso = false, $page = 1)
     {
         $url = $this->baseUrl . urlencode($keyword);
@@ -255,82 +203,65 @@ class SubitoScraper
             return [];
         }
     }
-    
+
     /**
      * Prepara un client HTTP con le impostazioni corrette e i proxy se necessario
      */
     protected function getHttpClient(): PendingRequest
     {
         $client = Http::withHeaders([
-            'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language' => 'en-US,en;q=0.5',
+            'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Language' => 'it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7',
+            'Accept-Encoding' => 'gzip, deflate, br',
             'Cache-Control' => 'no-cache',
-            'Pragma' => 'no-cache'
+            'Pragma' => 'no-cache',
+            'Sec-Ch-Ua' => '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
+            'Sec-Ch-Ua-Mobile' => '?0',
+            'Sec-Ch-Ua-Platform' => '"Windows"',
+            'Sec-Fetch-Dest' => 'document',
+            'Sec-Fetch-Mode' => 'navigate',
+            'Sec-Fetch-Site' => 'none',
+            'Sec-Fetch-User' => '?1',
+            'Upgrade-Insecure-Requests' => '1',
+            'Connection' => 'keep-alive',
+            'DNT' => '1'
         ]);
-        
-        // Aumenta il timeout di base (5 secondi di default in Laravel)
-        $timeout = 30; // 30 secondi di timeout standard
-        
-        // Aggiungi proxy se richiesto
+
         if ($this->useProxy && $this->currentProxy) {
-            // Quando si usa il proxy, aumentiamo ulteriormente il timeout
-            $timeout = 60; // 60 secondi quando si usa il proxy
-            
-            // Laravel's HTTP client non supporta direttamente proxy auth nel formato URL,
-            // quindi dobbiamo usare le curl options
+            try {
             Log::info("Configurazione proxy per HTTP client: {$this->currentProxy}");
             
-            try {
-                // Verifica che il proxy abbia il corretto formato
-                if (strpos($this->currentProxy, '@') !== false) {
-                    // Dividi l'URL del proxy nelle sue componenti
+                // Estrai i componenti del proxy
                     $pattern = '/^(?:http(?:s?):\/\/)?(?:([^:@]+):([^@]+)@)?([^:]+):(\d+)$/i';
                     if (preg_match($pattern, $this->currentProxy, $matches)) {
-                        $schema = 'http://';
-                        $username = $matches[1];
-                        $password = $matches[2];
+                    $username = $matches[1] ?? null;
+                    $password = $matches[2] ?? null;
                         $host = $matches[3];
                         $port = $matches[4];
                         
-                        Log::info("Proxy analizzato - Host: {$host}, Port: {$port}, User: {$username}");
-                        
-                        // Opzione 1: Usa solo curl options (più affidabile)
-                        $client->withOptions([
-                            'curl' => [
-                                CURLOPT_PROXY => "{$host}:{$port}",
-                                CURLOPT_PROXYUSERPWD => "{$username}:{$password}",
-                                CURLOPT_PROXYAUTH => CURLAUTH_BASIC,
-                                CURLOPT_FOLLOWLOCATION => 1,
-                                CURLOPT_TIMEOUT => $timeout,
-                                CURLOPT_CONNECTTIMEOUT => 30
+                    $client = $client->withOptions([
+                        'proxy' => [
+                            'http' => "http://{$host}:{$port}",
+                            'https' => "http://{$host}:{$port}"
+                        ],
+                        'verify' => false,
+                        'timeout' => 30,
+                        'connect_timeout' => 30
+                    ]);
+
+                    if ($username && $password) {
+                        $client = $client->withOptions([
+                            'proxy' => [
+                                'http' => "http://{$username}:{$password}@{$host}:{$port}",
+                                'https' => "http://{$username}:{$password}@{$host}:{$port}"
                             ]
                         ]);
-                        
-                        Log::info("Proxy configurato con curl options");
-                    } else {
-                        Log::warning("Formato proxy non valido: {$this->currentProxy}");
-                        $client->withOptions([
-                            'proxy' => $this->currentProxy,
-                            'timeout' => $timeout
-                        ]);
                     }
-                } else {
-                    // Proxy semplice senza autenticazione
-                    Log::info("Configurazione proxy semplice: {$this->currentProxy}");
-                    $client->withOptions([
-                        'proxy' => $this->currentProxy,
-                        'timeout' => $timeout
-                    ]);
                 }
             } catch (\Exception $e) {
                 Log::error("Errore configurazione proxy: " . $e->getMessage());
-                // Prosegui senza proxy in caso di errore, ma mantieni il timeout più alto
-                $client->timeout($timeout);
             }
-        } else {
-            // Senza proxy, usa il timeout standard
-            $client->timeout($timeout);
         }
         
         return $client;
@@ -368,5 +299,208 @@ class SubitoScraper
             'local_details' => $localIpDetails,
             'proxy_working' => ($this->proxyIpAddress && $this->localIpAddress && $this->proxyIpAddress !== $this->localIpAddress)
         ];
+    }
+
+    protected function extractAdsFromHtml($html)
+    {
+        $ads = [];
+        
+        try {
+            // Try to find JSON data in the HTML using different patterns
+            $patterns = [
+                '/"props":\s*({.+?})\s*,\s*"page"/',
+                '/"items":\s*(\[.+?\])\s*,\s*"rankedList"/',
+                '/"decoratedItems":\s*(\[.+?\])\s*,\s*"rankedList"/'
+            ];
+
+            foreach ($patterns as $pattern) {
+                if (preg_match('/' . $pattern . '/s', $html, $matches)) {
+                    Log::info("Found JSON data using pattern: " . $pattern);
+                    
+                    $jsonData = json_decode($matches[1], true);
+                    if ($jsonData) {
+                        // Extract items based on the pattern matched
+                        $items = $this->extractItemsFromJson($jsonData);
+                        if (!empty($items)) {
+                            foreach ($items as $item) {
+                                if (isset($item['item'])) {
+                                    $ad = $item['item'];
+                                    $ads[] = [
+                                        'title' => $ad['subject'] ?? null,
+                                        'price' => $this->extractPrice($ad),
+                                        'description' => $ad['body'] ?? null,
+                                        'url' => $ad['urls']['default'] ?? null,
+                                        'location' => $this->extractLocation($ad),
+                                        'images' => $this->extractImages($ad),
+                                        'condition' => $this->extractCondition($ad),
+                                        'date' => $ad['date'] ?? null
+                                    ];
+                                }
+                            }
+                            break; // Exit loop if we found and processed items
+                        }
+                    }
+                }
+            }
+            
+            Log::info("Successfully extracted " . count($ads) . " ads from JSON");
+            return $ads;
+            
+        } catch (\Exception $e) {
+            Log::error("Error extracting ads from HTML: " . $e->getMessage());
+            Log::error("Stack trace: " . $e->getTraceAsString());
+            return [];
+        }
+    }
+
+    protected function extractItemsFromJson($jsonData)
+    {
+        // Try different paths to find the items
+        if (isset($jsonData['pageProps']['dehydratedState']['queries'][0]['state']['data']['decoratedItems'])) {
+            return $jsonData['pageProps']['dehydratedState']['queries'][0]['state']['data']['decoratedItems'];
+        }
+        
+        if (isset($jsonData['pageProps']['initialData']['decoratedItems'])) {
+            return $jsonData['pageProps']['initialData']['decoratedItems'];
+        }
+        
+        if (isset($jsonData['decoratedItems'])) {
+            return $jsonData['decoratedItems'];
+        }
+
+        if (is_array($jsonData)) {
+            return $jsonData;
+        }
+
+        return [];
+    }
+
+    protected function extractPrice($ad)
+    {
+        if (isset($ad['features']['/price']['values'][0]['value'])) {
+            return $ad['features']['/price']['values'][0]['value'];
+        }
+        return null;
+    }
+
+    protected function extractLocation($ad)
+    {
+        if (isset($ad['geo'])) {
+            $location = [];
+            if (isset($ad['geo']['region']['value'])) {
+                $location['region'] = $ad['geo']['region']['value'];
+            }
+            if (isset($ad['geo']['city']['value'])) {
+                $location['city'] = $ad['geo']['city']['value'];
+            }
+            if (isset($ad['geo']['town']['value'])) {
+                $location['town'] = $ad['geo']['town']['value'];
+            }
+            return $location;
+        }
+        return null;
+    }
+
+    protected function extractImages($ad)
+    {
+        if (isset($ad['images'])) {
+            return array_map(function($image) {
+                return $image['cdnBaseUrl'] ?? null;
+            }, $ad['images']);
+        }
+        return [];
+    }
+
+    protected function extractCondition($ad)
+    {
+        if (isset($ad['features']['/item_condition']['values'][0]['value'])) {
+            return $ad['features']['/item_condition']['values'][0]['value'];
+        }
+        return null;
+    }
+
+    protected function processApiResponse($data)
+    {
+        $ads = [];
+        if (isset($data['items']) && is_array($data['items'])) {
+            foreach ($data['items'] as $item) {
+                $ads[] = [
+                    'title' => $item['subject'] ?? null,
+                    'description' => $item['body'] ?? null,
+                    'price' => $item['price'] ?? null,
+                    'condition' => $item['condition'] ?? null,
+                    'location' => $item['location'] ?? null,
+                    'date' => $item['date'] ?? null,
+                    'images' => $item['images'] ?? [],
+                    'link' => $item['url'] ?? null
+                ];
+            }
+        }
+        return $ads;
+    }
+
+    protected function processItems($items)
+    {
+        $ads = [];
+        foreach ($items as $item) {
+            try {
+                if (isset($item['item']) && $item['item']['kind'] === 'AdItem') {
+                    $ad = $item['item'];
+                    
+                    // Extract price
+                    $price = null;
+                    if (isset($ad['features']['/price']['values'][0]['value'])) {
+                        $price = $ad['features']['/price']['values'][0]['value'];
+                    }
+
+                    // Extract condition
+                    $condition = null;
+                    if (isset($ad['features']['/item_condition']['values'][0]['value'])) {
+                        $condition = $ad['features']['/item_condition']['values'][0]['value'];
+                    }
+
+                    // Extract location
+                    $location = [];
+                    if (isset($ad['geo'])) {
+                        if (isset($ad['geo']['region']['value'])) {
+                            $location[] = $ad['geo']['region']['value'];
+                        }
+                        if (isset($ad['geo']['city']['value'])) {
+                            $location[] = $ad['geo']['city']['value'];
+                        }
+                        if (isset($ad['geo']['town']['value'])) {
+                            $location[] = $ad['geo']['town']['value'];
+                        }
+                    }
+
+                    // Extract images
+                    $images = [];
+                    if (isset($ad['images'])) {
+                        foreach ($ad['images'] as $image) {
+                            if (isset($image['cdnBaseUrl'])) {
+                                $images[] = $image['cdnBaseUrl'];
+                            }
+                        }
+                    }
+
+                    $ads[] = [
+                        'title' => $ad['subject'] ?? null,
+                        'description' => $ad['body'] ?? null,
+                        'price' => $price,
+                        'condition' => $condition,
+                        'location' => implode(', ', $location),
+                        'date' => $ad['date'] ?? null,
+                        'images' => $images,
+                        'link' => $ad['urls']['default'] ?? null
+                    ];
+                }
+            } catch (\Exception $e) {
+                Log::warning("Error processing item: " . $e->getMessage());
+                continue;
+            }
+        }
+
+        Log::info("Processed " . count($ads) . " ads successfully");
+        return $ads;
     }
 } 

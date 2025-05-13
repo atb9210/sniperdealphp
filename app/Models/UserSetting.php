@@ -44,6 +44,6 @@ class UserSetting extends Model
      */
     public function hasActiveProxies(): bool
     {
-        return count($this->active_proxies) > 0;
+        return !empty($this->proxies) && count($this->getActiveProxiesAttribute()) > 0;
     }
 }
