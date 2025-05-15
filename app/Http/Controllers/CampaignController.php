@@ -148,9 +148,15 @@ class CampaignController extends Controller
     {
         $this->authorize('update', $campaign);
 
-        SubitoScraperJob::dispatch($campaign);
-
-        return redirect()->route('campaigns.index')
-            ->with('success', 'Job avviato manualmente per la campagna.');
+        try {
+            // Esegui il job immediatamente
+            SubitoScraperJob::dispatchSync($campaign);
+            
+            return redirect()->route('campaigns.index')
+                ->with('success', 'Campagna eseguita con successo.');
+        } catch (\Exception $e) {
+            return redirect()->route('campaigns.index')
+                ->with('error', 'Errore durante l\'esecuzione della campagna: ' . $e->getMessage());
+        }
     }
 }

@@ -24,3 +24,7 @@ yarn-error.log
 /.zed
 .DS_Store
 .dev-pids
+
+# File generati di supervisor
+/supervisor/*.conf
+!/supervisor/templates/*.conf.template

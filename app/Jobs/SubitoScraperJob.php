@@ -45,8 +45,10 @@ class SubitoScraperJob implements ShouldQueue
         try {
             Log::info("Starting campaign job: {$this->campaign->name} (ID: {$this->campaign->id})");
 
-            // Update campaign last run time
-            $this->campaign->updateNextRunTime();
+            // Update campaign last run time and next run time
+            $this->campaign->last_run_at = now();
+            $this->campaign->next_run_at = now()->addMinutes($this->campaign->interval_minutes);
+            $this->campaign->save();
 
             // Run the scraper
             $scraper = new SubitoScraper();

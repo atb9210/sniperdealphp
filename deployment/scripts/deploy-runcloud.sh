@@ -90,13 +90,9 @@ sudo chown -R $(whoami):$(whoami) storage bootstrap/cache || { echo "[WARNING] c
 # 10. Configurazione Supervisor
 echo "[STEP] Configurazione Supervisor..."
 if [ -d "supervisor" ]; then
-  # Aggiorna i percorsi nei file di configurazione
-  PROJECT_PATH=$(pwd)
-  USER=$(whoami)
-  
-  echo "[INFO] Aggiornamento configurazioni supervisor..."
-  sed -i.bak "s|/Users/atb/Documents/SnipeDealPhp|$PROJECT_PATH|g" supervisor/*.conf
-  sed -i.bak "s|user=atb|user=$USER|g" supervisor/*.conf
+  # Genera le configurazioni di supervisor
+  echo "[INFO] Generazione configurazioni supervisor..."
+  bash supervisor/generate-configs.sh
   
   # Copia i file di configurazione nella posizione corretta
   echo "[INFO] Copiando file di configurazione in /etc/supervisor/conf.d/"

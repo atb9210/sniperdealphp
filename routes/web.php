@@ -6,6 +6,7 @@ use App\Http\Controllers\UserSettingsController;
 use App\Http\Controllers\CampaignController;
 use App\Http\Controllers\JobLogController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\WorkerMonitorController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -42,6 +43,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/job-logs/{jobLog}', [JobLogController::class, 'show'])->name('job-logs.show');
     Route::get('/campaigns/{campaign}/job-logs', [JobLogController::class, 'forCampaign'])->name('job-logs.campaign');
     Route::post('/campaigns/{campaign}/job-logs/clear', [JobLogController::class, 'clear'])->name('job-logs.clear');
+
+    // Worker Monitor
+    Route::get('/worker-monitor', [WorkerMonitorController::class, 'index'])
+        ->name('worker-monitor.index');
 });
 
 require __DIR__.'/auth.php';
