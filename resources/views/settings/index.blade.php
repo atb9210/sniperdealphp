@@ -82,6 +82,7 @@
                                 <li>Invia il comando /newbot</li>
                                 <li>Segui le istruzioni per creare il tuo bot</li>
                                 <li>Copia il token fornito e incollalo nel campo "Token Bot Telegram"</li>
+                                <li><strong>Importante:</strong> Apri la chat con il tuo nuovo bot (puoi cercarlo tramite il suo username o cliccare il link t.me/NOMEDELBOT che ti fornisce @BotFather) e invia il comando <code>/start</code> o un qualsiasi messaggio per attivare la chat.</li>
                             </ol>
 
                             <h4 class="text-base font-medium mt-4">Come ottenere il tuo Chat ID:</h4>

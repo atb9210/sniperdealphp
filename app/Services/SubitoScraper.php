@@ -136,7 +136,7 @@ class SubitoScraper
             $url .= '&qso=true';
         }
         if ($page > 1) {
-            $url .= '&page=' . $page;
+            $url .= '&o=' . $page;
         }
         Log::info("Scraping URL: " . $url);
         
