@@ -50,8 +50,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/campaigns/{campaign}/job-logs/clear', [JobLogController::class, 'clear'])->name('job-logs.clear');
 
     // Worker Monitor
-    Route::get('/worker-monitor', [WorkerMonitorController::class, 'index'])
-        ->name('worker-monitor.index');
+    // Route::get('/worker-monitor', [WorkerMonitorController::class, 'index'])
+    //     ->name('worker-monitor.index');
 
     // Business Manager Routes
     Route::get('/business', [BusinessManagerController::class, 'index'])
