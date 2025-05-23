@@ -21,11 +21,17 @@
                     <x-nav-link :href="route('campaigns.index')" :active="request()->routeIs('campaigns.*')">
                         {{ __('Campagne') }}
                     </x-nav-link>
+                    <x-nav-link :href="route('campaign-results.index')" :active="request()->routeIs('campaign-results.*')">
+                        {{ __('Risultati') }}
+                    </x-nav-link>
                     <x-nav-link :href="route('job-logs.index')" :active="request()->routeIs('job-logs.*')">
                         {{ __('Job Logs') }}
                     </x-nav-link>
                     <x-nav-link :href="route('worker-monitor.index')" :active="request()->routeIs('worker-monitor.*')">
                         {{ __('Monitor Worker') }}
+                    </x-nav-link>
+                    <x-nav-link :href="route('business.index')" :active="request()->routeIs('business.*')">
+                        {{ __('Business Manager') }}
                     </x-nav-link>
                     <x-nav-link :href="route('settings.index')" :active="request()->routeIs('settings.*')">
                         {{ __('Impostazioni') }}
@@ -91,11 +97,17 @@
             <x-responsive-nav-link :href="route('campaigns.index')" :active="request()->routeIs('campaigns.*')">
                 {{ __('Campagne') }}
             </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('campaign-results.index')" :active="request()->routeIs('campaign-results.*')">
+                {{ __('Risultati') }}
+            </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('job-logs.index')" :active="request()->routeIs('job-logs.*')">
                 {{ __('Job Logs') }}
             </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('worker-monitor.index')" :active="request()->routeIs('worker-monitor.*')">
                 {{ __('Monitor Worker') }}
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('business.index')" :active="request()->routeIs('business.*')">
+                {{ __('Business Manager') }}
             </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('settings.index')" :active="request()->routeIs('settings.*')">
                 {{ __('Impostazioni') }}

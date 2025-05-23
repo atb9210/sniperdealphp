@@ -116,13 +116,16 @@ echo "[INFO] Queue worker riavviato"
 
 # 12. Avvio servizi
 echo "[STEP] Avvio servizi..."
-# Ferma tutti i servizi
-echo "[INFO] Fermando tutti i servizi..."
-sudo supervisorctl stop all || { echo "[WARNING] Impossibile fermare i servizi, proseguo comunque"; }
+# Ferma i servizi specifici di questa applicazione
+APP_NAME=$(basename $(pwd))
+echo "[INFO] Fermando i servizi di $APP_NAME..."
+sudo supervisorctl stop $APP_NAME-campaigns-scheduler || { echo "[WARNING] Impossibile fermare lo scheduler, proseguo comunque"; }
+sudo supervisorctl stop $APP_NAME-queue-worker:* || { echo "[WARNING] Impossibile fermare i worker, proseguo comunque"; }
 
-# Avvia tutti i servizi
-echo "[INFO] Avviando tutti i servizi..."
-sudo supervisorctl start all || { echo "[WARNING] Impossibile avviare i servizi, proseguo comunque"; }
+# Avvia i servizi specifici di questa applicazione
+echo "[INFO] Avviando i servizi di $APP_NAME..."
+sudo supervisorctl start $APP_NAME-campaigns-scheduler || { echo "[WARNING] Impossibile avviare lo scheduler, proseguo comunque"; }
+sudo supervisorctl start $APP_NAME-queue-worker:* || { echo "[WARNING] Impossibile avviare i worker, proseguo comunque"; }
 
 # Mostra lo stato dei servizi
 echo "[INFO] Stato dei servizi:"

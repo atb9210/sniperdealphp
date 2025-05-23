@@ -1,4 +1,4 @@
-[program:campaigns-scheduler]
+[program:{{APP_NAME}}-campaigns-scheduler]
 process_name=%(program_name)s
 directory={{APP_PATH}}
 command=bash -c "while true; do php artisan campaigns:run; sleep 60; done"

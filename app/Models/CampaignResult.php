@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class CampaignResult extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'campaign_id',
         'title',
@@ -23,10 +26,10 @@ class CampaignResult extends Model
     ];
 
     protected $casts = [
-        'spedizione' => 'boolean',
+        'extra_data' => 'array',
         'notified' => 'boolean',
         'is_new' => 'boolean',
-        'extra_data' => 'array',
+        'spedizione' => 'boolean',
     ];
 
     /**
@@ -35,6 +38,14 @@ class CampaignResult extends Model
     public function campaign(): BelongsTo
     {
         return $this->belongsTo(Campaign::class);
+    }
+
+    /**
+     * Get the deal associated with this result.
+     */
+    public function deal()
+    {
+        return $this->hasOne(Deal::class);
     }
 
     /**

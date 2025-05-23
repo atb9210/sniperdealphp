@@ -151,8 +151,8 @@ class CampaignController extends Controller
         try {
             // Esegui il job immediatamente
             SubitoScraperJob::dispatchSync($campaign);
-            
-            return redirect()->route('campaigns.index')
+
+        return redirect()->route('campaigns.index')
                 ->with('success', 'Campagna eseguita con successo.');
         } catch (\Exception $e) {
             return redirect()->route('campaigns.index')

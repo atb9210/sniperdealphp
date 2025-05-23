@@ -1,4 +1,4 @@
-[program:queue-worker]
+[program:{{APP_NAME}}-queue-worker]
 process_name=%(program_name)s_%(process_num)02d
 directory={{APP_PATH}}
 command=php artisan queue:work --tries=3 --max-time=3600
