@@ -11,7 +11,9 @@ fi
 # Crea directory logs se non esiste
 mkdir -p deployment/logs
 
-LOG="deployment/logs/deploy-debug.log"
+# Crea un nuovo file di log con timestamp
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+LOG="deployment/logs/deploy-debug_${TIMESTAMP}.log"
 exec > >(tee -a "$LOG") 2>&1
 
 echo "==== DEPLOY START $(date) ===="

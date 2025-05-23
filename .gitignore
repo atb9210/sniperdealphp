@@ -28,3 +28,8 @@ yarn-error.log
 # File generati di supervisor
 /supervisor/*.conf
 !/supervisor/templates/*.conf.template
+
+/.cursor
+*.log
+deployment/logs/*.log
+deployment/logs/deploy-debug_*.log
